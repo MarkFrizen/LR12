@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Marketplace — Главная{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Добро пожаловать на Marketplace</h1>
+    <p>Платформа для продавцов и покупателей. Покупайте и продавайте товары с удобством.</p>
+    <div class="hero-actions">
+        <a href="/register" class="btn btn-primary">Зарегистрироваться</a>
+        <a href="/login" class="btn btn-secondary">Войти</a>
+    </div>
+</section>
+<section class="features">
+    <div class="feature-card">
+        <h3>🛍️ Товары</h3>
+        <p>Широкий ассортимент товаров от проверенных продавцов.</p>
+    </div>
+    <div class="feature-card">
+        <h3>🚚 Доставка</h3>
+        <p>Быстрая доставка курьерами и перевозчиками.</p>
+    </div>
+    <div class="feature-card">
+        <h3>⭐ Отзывы</h3>
+        <p>Честные отзывы покупателей помогают сделать выбор.</p>
+    </div>
+</section>
+{% endblock %}

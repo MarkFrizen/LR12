@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Отзывы{% endblock %}
+{% block content %}
+<section class="page-section">
+    <h1>Отзывы покупателей</h1>
+    <div class="filters">
+        <input type="number" id="filterProduct" placeholder="ID товара" min="1">
+        <button class="btn btn-primary" onclick="loadReviews()">Поиск</button>
+    </div>
+    <div id="reviewsList" class="data-list"><p>Загрузка...</p></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadReviews() {
+    const token = localStorage.getItem('token');
+    const productId = document.getElementById('filterProduct').value;
+    let url = '/api/v1/reviews/?limit=50';
+    if (productId) url += `&product_id=${productId}`;
+    try {
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(url, {headers});
+        const reviews = await res.json();
+        const list = document.getElementById('reviewsList');
+        if (reviews.length === 0) {
+            list.innerHTML = '<p class="empty">Отзывов нет.</p>';
+            return;
+        }
+        list.innerHTML = `<div class="reviews-grid">
+            ${reviews.map(r => `
+                <div class="review-card">
+                    <div class="review-header">
+                        <strong>${r.buyer_name}</strong>
+                        <span class="rating">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+                    </div>
+                    <p class="review-comment">${r.comment || 'Без комментария'}</p>
+                    <small>Товар #${r.product_id}</small>
+                </div>
+            `).join('')}
+        </div>`;
+    } catch { document.getElementById('reviewsList').innerHTML = '<p class="error">Ошибка загрузки</p>'; }
+}
+document.addEventListener('DOMContentLoaded', loadReviews);
+</script>
+{% endblock %}

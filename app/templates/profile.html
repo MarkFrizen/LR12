@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<section class="page-section">
+    <h1>Профиль пользователя</h1>
+    <div id="profileInfo" class="card"><p>Загрузка...</p></div>
+    <form id="profileForm" class="auth-form" style="display:none;">
+        <div class="form-group">
+            <label for="full_name">Полное имя</label>
+            <input type="text" id="full_name" name="full_name">
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email">
+        </div>
+        <div class="form-group">
+            <label for="phone">Телефон</label>
+            <input type="text" id="phone" name="phone">
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </form>
+    <div id="profileError" class="error-message"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+    try {
+        const res = await fetch('/api/v1/auth/me', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        const user = await res.json();
+        document.getElementById('profileInfo').innerHTML = `
+            <p><strong>Имя:</strong> ${user.full_name || '—'}</p>
+            <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Телефон:</strong> ${user.phone || '—'}</p>
+            <p><strong>Роль:</strong> ${user.role}</p>
+        `;
+        const form = document.getElementById('profileForm');
+        form.style.display = 'block';
+        document.getElementById('full_name').value = user.full_name || '';
+        document.getElementById('email').value = user.email;
+        document.getElementById('phone').value = user.phone || '';
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                full_name: document.getElementById('full_name').value || null,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value || null
+            };
+            try {
+                const r = await fetch('/api/v1/auth/me', {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+                    body: JSON.stringify(data)
+                });
+                if (!r.ok) throw new Error((await r.json()).detail);
+                alert('Профиль обновлён!');
+                window.location.reload();
+            } catch (err) {
+                document.getElementById('profileError').textContent = err.message;
+            }
+        });
+    } catch { window.location.href = '/login'; }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Marketplace{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">Marketplace</a>
+            <div class="nav-links" id="navLinks">
+                <a href="/">Главная</a>
+                <a href="/products-page">Товары</a>
+                <a href="/orders-page">Заказы</a>
+                <a href="/reviews-page">Отзывы</a>
+                <a href="/dashboard">Дашборд</a>
+                <span id="authLinks"></span>
+            </div>
+        </div>
+    </nav>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">
+        <p>&copy; 2026 Marketplace Platform. Все права защищены.</p>
+    </footer>
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

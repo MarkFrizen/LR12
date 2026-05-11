@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Дашборд{% endblock %}
+{% block content %}
+<section class="dashboard">
+    <h1>Дашборд</h1>
+    <div id="userInfo" class="card">
+        <p>Загрузка данных...</p>
+    </div>
+    <div class="dashboard-grid" id="dashboardGrid"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+    try {
+        const res = await fetch('/api/v1/auth/me', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        if (!res.ok) throw new Error('Unauthorized');
+        const user = await res.json();
+        document.getElementById('userInfo').innerHTML = `
+            <h3>Добро пожаловать, ${user.full_name || user.username}!</h3>
+            <p>Роль: <strong>${user.role}</strong> | Email: ${user.email}</p>
+        `;
+        const grid = document.getElementById('dashboardGrid');
+        const cards = [
+            {title: '🛍️ Товары', link: '/products-page', desc: 'Просмотр и управление товарами'},
+            {title: '📦 Заказы', link: '/orders-page', desc: 'Ваши заказы'},
+            {title: '⭐ Отзывы', link: '/reviews-page', desc: 'Отзывы о товарах'},
+            {title: '👤 Профиль', link: '/profile', desc: 'Редактировать профиль'},
+        ];
+        if (user.role === 'admin' || user.role === 'moderator') {
+            cards.push({title: '⚙️ Админ-панель', link: '/admin', desc: 'Управление пользователями'});
+        }
+        grid.innerHTML = cards.map(c => `
+            <a href="${c.link}" class="dashboard-card">
+                <h3>${c.title}</h3>
+                <p>${c.desc}</p>
+            </a>
+        `).join('');
+    } catch {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+    }
+});
+</script>
+{% endblock %}

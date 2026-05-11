@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+<section class="auth-form">
+    <h2>Вход в систему</h2>
+    <form id="loginForm">
+        <div class="form-group">
+            <label for="username">Имя пользователя</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Пароль</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Войти</button>
+        <p class="form-footer">Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
+    </form>
+    <div id="loginError" class="error-message" style="display:none;"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    try {
+        const res = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username, password})
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Ошибка входа');
+        }
+        const data = await res.json();
+        localStorage.setItem('token', data.access_token);
+        window.location.href = '/dashboard';
+    } catch (err) {
+        document.getElementById('loginError').textContent = err.message;
+        document.getElementById('loginError').style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

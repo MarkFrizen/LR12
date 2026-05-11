@@ -1,0 +1,64 @@
+"""REST-эндпоинты для комиссий."""
+
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models.commission import CommissionCreate, CommissionResponse, CommissionUpdate
+from app.services.commission_service import CommissionService
+
+router = APIRouter(prefix="/api/v1/commissions", tags=["Комиссии"])
+
+
+async def get_commission_service(
+    db: AsyncSession = Depends(get_db),
+) -> CommissionService:
+    return CommissionService(db=db)
+
+
+@router.post("/", response_model=CommissionResponse, status_code=status.HTTP_201_CREATED)
+async def create_commission(
+    data: CommissionCreate,
+    service: CommissionService = Depends(get_commission_service),
+):
+    return await service.create(data)
+
+
+@router.get("/", response_model=list[CommissionResponse])
+async def list_commissions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    seller_id: Optional[int] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    service: CommissionService = Depends(get_commission_service),
+):
+    return await service.get_all(
+        skip=skip, limit=limit, seller_id=seller_id, status=status_filter
+    )
+
+
+@router.get("/{commission_id}", response_model=CommissionResponse)
+async def get_commission(
+    commission_id: int,
+    service: CommissionService = Depends(get_commission_service),
+):
+    return await service.get_by_id(commission_id)
+
+
+@router.patch("/{commission_id}", response_model=CommissionResponse)
+async def update_commission(
+    commission_id: int,
+    data: CommissionUpdate,
+    service: CommissionService = Depends(get_commission_service),
+):
+    return await service.update(commission_id, data)
+
+
+@router.delete("/{commission_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_commission(
+    commission_id: int,
+    service: CommissionService = Depends(get_commission_service),
+):
+    await service.delete(commission_id)
