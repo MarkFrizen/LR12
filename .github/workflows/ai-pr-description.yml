@@ -1,0 +1,133 @@
+# Workflow: AI PR Description + AI Code Review
+#
+# При создании нового PR выполняет два анализа на основе git diff:
+#
+#   1. AI PR Description — генерирует текстовое описание изменений
+#   2. AI Code Review    — проверяет код на типовые ошибки маркетплейса
+#
+# Каждый результат публикуется отдельным комментарием к PR.
+#
+# Требуется секрет репозитория: OPENAI_API_KEY
+#
+# Шаги:
+#   1. actions/checkout@v4               — клонирование
+#   2. shell (bash)                      — получение git diff (base64)
+#   3. koudaiii/openai-api@v3            — генерация описания
+#   4. actions/github-script@v7          — комментарий с описанием
+#   5. koudaiii/openai-api@v3            — code review
+#   6. actions/github-script@v7          — комментарий с ревью
+
+name: AI PR Description & Code Review
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  analyze:
+    name: AI Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      # ═══════════════════════════════════════════════
+      # Шаг 1 — Клонирование
+      # ═══════════════════════════════════════════════
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ═══════════════════════════════════════════════
+      # Шаг 2 — Получение git diff (общий для обоих ИИ-вызовов)
+      # ═══════════════════════════════════════════════
+      - name: Get git diff (base64)
+        id: git_diff
+        run: |
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- . \
+            | head -c 15000 \
+            | base64 -w 0)
+          echo "diff_b64=$DIFF" >> "$GITHUB_OUTPUT"
+
+      # ═══════════════════════════════════════════════
+      # Шаг 3 — Генерация описания PR (AI PR Description)
+      # ═══════════════════════════════════════════════
+      - name: Generate PR description via OpenAI
+        id: openai_description
+        uses: koudaiii/openai-api@v3
+        with:
+          endpoint: "https://api.openai.com/v1/chat/completions"
+          model: "gpt-4o-mini"
+          messages: |
+            [
+              {
+                "role": "system",
+                "content": "Ты — ассистент, анализирующий изменения кода в Pull Request. Отвечай на русском языке."
+              },
+              {
+                "role": "user",
+                "content": "Проанализируй git diff (base64 ниже).\n\n1. Какие файлы изменены?\n2. Общая цель: баги / новый функционал / рефакторинг / безопасность?\n3. Есть ли миграции БД, изменения API, новые зависимости?\n\nФормат ответа:\n\n## Описание изменений\n\n### Кратко\n(1-2 предложения)\n\n### Список изменений\n- файл: что изменено\n\n### Важные замечания\n(миграции, API, зависимости)\n\nДифф:\n${{ steps.git_diff.outputs.diff_b64 }}"
+              }
+            ]
+          apiKey: ${{ secrets.OPENAI_API_KEY }}
+          temperature: 0.3
+          max_tokens: 2000
+
+      # ═══════════════════════════════════════════════
+      # Шаг 4 — Комментарий с описанием PR
+      # ═══════════════════════════════════════════════
+      - name: Post PR description comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const desc = `${{ steps.openai_description.outputs.content }}`;
+            const body = `## 📋 AI-описание изменений\n\n${desc}\n\n---\n*Сгенерировано на основе git diff*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body,
+            });
+
+      # ═══════════════════════════════════════════════
+      # Шаг 5 — AI Code Review (проверка на ошибки маркетплейса)
+      # ═══════════════════════════════════════════════
+      - name: Run AI Code Review via OpenAI
+        id: openai_review
+        uses: koudaiii/openai-api@v3
+        with:
+          endpoint: "https://api.openai.com/v1/chat/completions"
+          model: "gpt-4o-mini"
+          messages: |
+            [
+              {
+                "role": "system",
+                "content": "Ты — senior Python-разработчик, проводящий code review маркетплейса на FastAPI + SQLAlchemy. Отвечай на русском языке. Будь строг и предметен. Каждую найденную проблему сопровождай фрагментом кода и рекомендацией."
+              },
+              {
+                "role": "user",
+                "content": "Проверь код из git diff (base64 ниже) на типовые ошибки маркетплейса.\n\nОсобое внимание удели:\n\n1. **Расчёт комиссии без учёта скидки** — комиссия берётся от полной цены, а не от цены со скидкой.\n2. **Доступ к заказам без проверки роли продавца** — эндпоинты заказов, где любой пользователь может смотреть/менять чужие заказы (отсутствие Depends(require_seller) / require_buyer / ownership).\n3. **Невалидированная цена** — price допускает отрицательные значения, отсутствует Field(gt=0) в Pydantic.\n4. **Незакрытая транзакция** — async-сессия не закрывается при исключении, commit/rollback не сбалансированы.\n5. **N+1 запросы** — циклы с отдельными запросами к БД вместо JOIN или selectinload.\n6. **Утечка чувствительных данных** — хэш пароля, email, телефон в логах или ответах API.\n7. **Отсутствие idempotency-key** — повторный POST создаёт дубликаты заказов/платежей.\n\nФормат ответа — таблица на русском:\n\n## Результат AI Code Review\n\n| # | Файл | Проблема | Серьёзность | Рекомендация |\n|---|------|----------|-------------|--------------|\n| 1 | `app/services/x.py:42` | Описание | 🔴 / 🟠 / 🟡 | Как исправить |\n\nЕсли критических проблем нет — напиши:\n\n## Результат AI Code Review\n\n✅ **Критических проблем не найдено.**\n\nДифф:\n${{ steps.git_diff.outputs.diff_b64 }}"
+              }
+            ]
+          apiKey: ${{ secrets.OPENAI_API_KEY }}
+          temperature: 0.2
+          max_tokens: 3000
+
+      # ═══════════════════════════════════════════════
+      # Шаг 6 — Комментарий с результатами code review
+      # ═══════════════════════════════════════════════
+      - name: Post AI Code Review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const review = `${{ steps.openai_review.outputs.content }}`;
+            const body = `## 🔍 AI Code Review\n\n${review}\n\n---\n*Проверка на типовые ошибки маркетплейса. Модель: gpt-4o-mini*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body,
+            });
