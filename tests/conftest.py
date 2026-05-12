@@ -4,6 +4,12 @@
 Использует aiosqlite для асинхронных тестов без PostgreSQL.
 """
 
+import os
+
+# Установка переменных окружения для тестовой среды
+# (должна быть до любого импорта app-модулей)
+os.environ.setdefault("MP_JWT_SECRET", "test-secret-key-not-for-production")
+
 from collections.abc import AsyncGenerator
 from typing import AsyncGenerator
 

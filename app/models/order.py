@@ -64,7 +64,12 @@ class OrderORM(Base):
 class OrderBase(BaseModel):
     """Общие поля заказа."""
 
-    buyer_name: str = Field(..., min_length=1, max_length=255, description="Имя покупателя")
+    buyer_name: str = Field(
+        default="",
+        min_length=0,
+        max_length=255,
+        description="Имя покупателя (игнорируется, устанавливается из JWT)",
+    )
     quantity: int = Field(..., gt=0, description="Количество единиц товара")
 
 

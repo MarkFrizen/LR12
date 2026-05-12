@@ -54,12 +54,13 @@ class SellerCreate(SellerBase):
 
 
 class SellerUpdate(BaseModel):
-    """Схема для частичного обновления продавца (PATCH-запрос)."""
+    """Схема для частичного обновления продавца (PATCH-запрос).
+    rating исключён — пересчитывается автоматически из отзывов.
+    """
 
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(None, max_length=20)
-    rating: Optional[float] = Field(None, ge=0.0, le=5.0)
 
 
 class SellerResponse(SellerBase):

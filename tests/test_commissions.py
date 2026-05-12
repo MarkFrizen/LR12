@@ -1,5 +1,8 @@
 """
 Тесты сервиса комиссий.
+
+Покрытие: создание, чтение, обновление статуса, удаление комиссий,
+обработка CommissionNotFound.
 """
 
 import pytest
@@ -17,17 +20,23 @@ from app.services.product_service import ProductService
 from app.services.seller_service import SellerService
 
 
+_TEST_USER_ID = 1
+_TEST_BUYER = "buyer"
+
+
 @pytest.mark.asyncio
 async def test_create_commission(db_session: AsyncSession):
     seller = await SellerService(db=db_session).create(
-        SellerCreate(name="ComSeller", email="com@test.com")
+        SellerCreate(name="ComSeller", email="com@test.com"),
+        user_id=_TEST_USER_ID,
     )
     product = await ProductService(db=db_session).create(ProductCreate(
         seller_id=seller.id, name="ComItem", price=100, stock=10
-    ))
-    order = await OrderService(db=db_session).create(OrderCreate(
-        product_id=product.id, seller_id=seller.id, buyer_name="Buyer", quantity=1
-    ))
+    ), user_id=_TEST_USER_ID)
+    order = await OrderService(db=db_session).create(
+        OrderCreate(product_id=product.id, seller_id=seller.id, quantity=1),
+        buyer_username=_TEST_BUYER,
+    )
     service = CommissionService(db=db_session)
     commission = await service.create(CommissionCreate(
         order_id=order.id,
@@ -43,14 +52,16 @@ async def test_create_commission(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_get_commission_by_id(db_session: AsyncSession):
     seller = await SellerService(db=db_session).create(
-        SellerCreate(name="GetCom", email="gc@test.com")
+        SellerCreate(name="GetCom", email="gc@test.com"),
+        user_id=_TEST_USER_ID,
     )
     product = await ProductService(db=db_session).create(ProductCreate(
         seller_id=seller.id, name="GetComItem", price=100, stock=10
-    ))
-    order = await OrderService(db=db_session).create(OrderCreate(
-        product_id=product.id, seller_id=seller.id, buyer_name="B", quantity=1
-    ))
+    ), user_id=_TEST_USER_ID)
+    order = await OrderService(db=db_session).create(
+        OrderCreate(product_id=product.id, seller_id=seller.id, quantity=1),
+        buyer_username=_TEST_BUYER,
+    )
     service = CommissionService(db=db_session)
     commission = await service.create(CommissionCreate(
         order_id=order.id, seller_id=seller.id, amount=Decimal("5"), percentage=Decimal("5")
@@ -62,14 +73,16 @@ async def test_get_commission_by_id(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_update_commission_status(db_session: AsyncSession):
     seller = await SellerService(db=db_session).create(
-        SellerCreate(name="UpdCom", email="uc@test.com")
+        SellerCreate(name="UpdCom", email="uc@test.com"),
+        user_id=_TEST_USER_ID,
     )
     product = await ProductService(db=db_session).create(ProductCreate(
         seller_id=seller.id, name="UpdComItem", price=200, stock=5
-    ))
-    order = await OrderService(db=db_session).create(OrderCreate(
-        product_id=product.id, seller_id=seller.id, buyer_name="B", quantity=1
-    ))
+    ), user_id=_TEST_USER_ID)
+    order = await OrderService(db=db_session).create(
+        OrderCreate(product_id=product.id, seller_id=seller.id, quantity=1),
+        buyer_username=_TEST_BUYER,
+    )
     service = CommissionService(db=db_session)
     commission = await service.create(CommissionCreate(
         order_id=order.id, seller_id=seller.id, amount=Decimal("20"), percentage=Decimal("10")
@@ -81,14 +94,16 @@ async def test_update_commission_status(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_delete_commission(db_session: AsyncSession):
     seller = await SellerService(db=db_session).create(
-        SellerCreate(name="DelCom", email="dc@test.com")
+        SellerCreate(name="DelCom", email="dc@test.com"),
+        user_id=_TEST_USER_ID,
     )
     product = await ProductService(db=db_session).create(ProductCreate(
         seller_id=seller.id, name="DelComItem", price=50, stock=5
-    ))
-    order = await OrderService(db=db_session).create(OrderCreate(
-        product_id=product.id, seller_id=seller.id, buyer_name="B", quantity=1
-    ))
+    ), user_id=_TEST_USER_ID)
+    order = await OrderService(db=db_session).create(
+        OrderCreate(product_id=product.id, seller_id=seller.id, quantity=1),
+        buyer_username=_TEST_BUYER,
+    )
     service = CommissionService(db=db_session)
     commission = await service.create(CommissionCreate(
         order_id=order.id, seller_id=seller.id, amount=Decimal("5"), percentage=Decimal("10")

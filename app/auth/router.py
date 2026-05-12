@@ -19,6 +19,7 @@ from app.auth.dependencies import (
     require_admin,
 )
 from app.auth.models import (
+    ChangePasswordRequest,
     TokenResponse,
     UserCreate,
     UserLogin,
@@ -72,6 +73,21 @@ async def update_profile(
 ):
     """Обновить свой профиль."""
     return await auth_service.update_profile(db, current_user.id, data)
+
+
+@router.post("/change-password", response_model=dict)
+async def change_password(
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
+):
+    """
+    Сменить пароль текущего пользователя.
+
+    Требуется указать старый пароль для верификации.
+    """
+    await auth_service.change_password(db, current_user.id, data)
+    return {"message": "Пароль успешно изменён."}
 
 
 # ─── Админ-эндпоинты ───

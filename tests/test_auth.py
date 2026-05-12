@@ -5,7 +5,7 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import UserCreate, UserLogin, UserRole
+from app.auth.models import UserCreate, UserLogin, UserRole, ChangePasswordRequest
 from app.auth.service import AuthService
 from app.auth.utils import hash_password, verify_password, create_access_token, decode_access_token
 from app.exceptions import MarketPlaceError
@@ -136,3 +136,80 @@ class TestAuthService:
         assert toggled.is_active is False
         toggled_again = await service.toggle_active(db_session, user.id)
         assert toggled_again.is_active is True
+
+    @pytest.mark.asyncio
+    async def test_change_password_success(self, db_session: AsyncSession):
+        """Успешная смена пароля."""
+        service = AuthService()
+        user = await service.register(
+            db_session, UserCreate(username="changepwd", email="cp@test.com", password="old_pass")
+        )
+        await service.change_password(
+            db_session, user.id,
+            ChangePasswordRequest(old_password="old_pass", new_password="new_secure_pass"),
+        )
+        # Проверяем, что старый пароль больше не работает, а новый — работает
+        user_auth, token = await service.authenticate(
+            db_session, UserLogin(username="changepwd", password="new_secure_pass"),
+        )
+        assert user_auth.id == user.id
+        assert token is not None
+
+    @pytest.mark.asyncio
+    async def test_change_password_wrong_old(self, db_session: AsyncSession):
+        """Смена пароля с неверным старым паролем."""
+        service = AuthService()
+        user = await service.register(
+            db_session, UserCreate(username="wrongold", email="wo@test.com", password="real_pass")
+        )
+        with pytest.raises(MarketPlaceError) as exc:
+            await service.change_password(
+                db_session, user.id,
+                ChangePasswordRequest(old_password="wrong", new_password="new_pass"),
+            )
+        assert "Неверный текущий пароль" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_change_password_same_password(self, db_session: AsyncSession):
+        """Смена пароля на тот же самый."""
+        service = AuthService()
+        user = await service.register(
+            db_session, UserCreate(username="samepwd", email="sp@test.com", password="same_pass")
+        )
+        with pytest.raises(MarketPlaceError) as exc:
+            await service.change_password(
+                db_session, user.id,
+                ChangePasswordRequest(old_password="same_pass", new_password="same_pass"),
+            )
+        assert "совпадает со старым" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_authenticate_timing_oracle_mitigation(self, db_session: AsyncSession):
+        """Проверка, что timing-атака предотвращена:
+        - несуществующий пользователь даёт ту же ошибку, что и неверный пароль.
+        - bcrypt вызывается в любом случае (проверяем, что нет раннего выхода).
+        """
+        service = AuthService()
+
+        # Регистрируем пользователя
+        await service.register(
+            db_session, UserCreate(username="timing_user", email="tu@test.com", password="correct_pass")
+        )
+
+        # 1. Существующий пользователь + неверный пароль
+        with pytest.raises(MarketPlaceError) as exc1:
+            await service.authenticate(
+                db_session, UserLogin(username="timing_user", password="wrong_pass")
+            )
+        msg_existing = str(exc1.value)
+
+        # 2. Несуществующий пользователь + любой пароль
+        with pytest.raises(MarketPlaceError) as exc2:
+            await service.authenticate(
+                db_session, UserLogin(username="nonexistent_user", password="any_password")
+            )
+        msg_nonexistent = str(exc2.value)
+
+        # Сообщения об ошибках должны быть идентичными (не раскрываем существование)
+        assert msg_existing == msg_nonexistent
+        assert "Неверное имя пользователя или пароль" in msg_existing

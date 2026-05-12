@@ -44,7 +44,12 @@ class ReviewORM(Base):
 class ReviewBase(BaseModel):
     """Общие поля отзыва."""
 
-    buyer_name: str = Field(..., min_length=1, max_length=255, description="Имя покупателя")
+    buyer_name: str = Field(
+        default="",
+        min_length=0,
+        max_length=255,
+        description="Имя покупателя (игнорируется, устанавливается из JWT)",
+    )
     rating: int = Field(..., ge=1, le=5, description="Оценка от 1 до 5")
     comment: Optional[str] = Field(None, description="Текст отзыва")
 

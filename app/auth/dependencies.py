@@ -13,7 +13,7 @@ from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.config import auth_settings
-from app.auth.models import MODERATION_ROLES, UserORM, UserRole
+from app.auth.models import UserORM, UserRole
 from app.auth.service import auth_service
 from app.database import get_db
 

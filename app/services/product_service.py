@@ -1,9 +1,13 @@
 """
 CRUD-операции для сущности «Товар».
+
+Реализует проверку прав доступа: продавец может изменять только свои товары,
+администратор и модератор — любые.
 """
 
 from typing import Optional
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +18,9 @@ from app.models.seller import SellerORM
 
 logger = get_logger(__name__)
 
+# Роли, которым разрешено управлять любыми товарами
+_MODERATION_ROLES = {"admin", "moderator"}
+
 
 class ProductService:
     """Сервис для управления товарами."""
@@ -21,7 +28,20 @@ class ProductService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, data: ProductCreate) -> ProductORM:
+    async def create(self, data: ProductCreate, user_id: int) -> ProductORM:
+        """
+        Создать новый товар.
+
+        Args:
+            data: Данные товара.
+            user_id: ID текущего пользователя (для логирования).
+
+        Returns:
+            ProductORM — сохранённый товар.
+
+        Raises:
+            SellerNotFoundError: Если продавец не найден.
+        """
         seller = await self.db.execute(
             select(SellerORM).where(SellerORM.id == data.seller_id)
         )
@@ -33,11 +53,12 @@ class ProductService:
         self.db.add(product)
         await self.db.flush()
         await self.db.refresh(product)
-        logger.info("Создан товар id=%d name='%s' price=%s seller_id=%d",
-                     product.id, product.name, product.price, product.seller_id)
+        logger.info("Создан товар id=%d name='%s' price=%s seller_id=%d (user_id=%d)",
+                     product.id, product.name, product.price, product.seller_id, user_id)
         return product
 
     async def get_by_id(self, product_id: int) -> ProductORM:
+        """Получить товар по ID."""
         result = await self.db.execute(
             select(ProductORM).where(ProductORM.id == product_id)
         )
@@ -55,6 +76,7 @@ class ProductService:
         seller_id: Optional[int] = None,
         category: Optional[str] = None,
     ) -> list[ProductORM]:
+        """Получить список товаров с фильтрацией."""
         query = select(ProductORM)
         if seller_id is not None:
             query = query.where(ProductORM.seller_id == seller_id)
@@ -68,18 +90,46 @@ class ProductService:
         return products
 
     async def update(
-        self, product_id: int, data: ProductUpdate
+        self, product_id: int, data: ProductUpdate, user_id: int, user_role: str
     ) -> ProductORM:
+        """
+        Обновить товар.
+
+        Args:
+            product_id: ID товара.
+            data: Новые данные.
+            user_id: ID текущего пользователя.
+            user_role: Роль текущего пользователя.
+
+        Returns:
+            ProductORM — обновлённый товар.
+
+        Raises:
+            HTTPException(403): Если пользователь не является владельцем
+                                и не имеет модераторской роли.
+        """
         product = await self.get_by_id(product_id)
+
+        # Проверка прав: владелец товара или модератор/админ
+        if user_role not in _MODERATION_ROLES and product.seller_id != user_id:
+            logger.warning("Пользователь id=%d попытался изменить товар id=%d продавца id=%d",
+                           user_id, product_id, product.seller_id)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Недостаточно прав для изменения этого товара.",
+            )
+
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(product, field, value)
         await self.db.flush()
         await self.db.refresh(product)
-        logger.info("Обновлён товар id=%d поля=%s", product_id, list(update_data.keys()))
+        logger.info("Обновлён товар id=%d поля=%s (user_id=%d)",
+                     product_id, list(update_data.keys()), user_id)
         return product
 
     async def delete(self, product_id: int) -> None:
+        """Удалить товар (только для администратора)."""
         product = await self.get_by_id(product_id)
         await self.db.delete(product)
         await self.db.flush()

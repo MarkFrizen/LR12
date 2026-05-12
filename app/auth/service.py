@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import (
-    MODERATION_ROLES,
+    ChangePasswordRequest,
     UserCreate,
     UserLogin,
     UserORM,
@@ -22,6 +22,11 @@ from app.exceptions import MarketPlaceError
 from app.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Фиктивный хэш для защиты от timing-атак
+# Используется, когда запрашивается несуществующий пользователь,
+# чтобы время ответа не отличалось от существующего.
+_DUMMY_HASH = hash_password("__timing_mitigation_dummy__")
 
 
 class AuthService:
@@ -84,6 +89,10 @@ class AuthService:
         """
         Аутентифицировать пользователя и вернуть JWT-токен.
 
+        Реализует константную по времени проверку пароля:
+        bcrypt выполняется в любом случае, даже если пользователь не найден,
+        чтобы предотвратить timing-атаки (CWE-208).
+
         Args:
             db: Сессия БД.
             data: Учётные данные.
@@ -99,11 +108,14 @@ class AuthService:
             select(UserORM).where(UserORM.username == data.username)
         )
         user = result.scalar_one_or_none()
-        if not user:
-            raise MarketPlaceError("Неверное имя пользователя или пароль.", 401)
 
-        if not verify_password(data.password, user.hashed_password):
-            logger.warning("Неудачная попытка входа для '%s' (неверный пароль)", data.username)
+        # Константная по времени проверка: bcrypt выполняется всегда
+        # Для несуществующего пользователя используется фиктивный хэш,
+        # чтобы время ответа не отличалось от существующего.
+        password_hash = user.hashed_password if user else _DUMMY_HASH
+        password_valid = verify_password(data.password, password_hash)
+
+        if not password_valid or user is None:
             raise MarketPlaceError("Неверное имя пользователя или пароль.", 401)
 
         if not user.is_active:
@@ -113,6 +125,40 @@ class AuthService:
         token = create_access_token({"sub": str(user.id), "role": user.role})
         logger.info("Успешный вход пользователя id=%d username='%s'", user.id, user.username)
         return user, token
+
+    async def change_password(
+        self, db: AsyncSession, user_id: int, data: ChangePasswordRequest
+    ) -> None:
+        """
+        Сменить пароль пользователя.
+
+        Args:
+            db: Сессия БД.
+            user_id: ID пользователя.
+            data: Старый и новый пароль.
+
+        Raises:
+            MarketPlaceError: Если старый пароль неверен,
+                              или новый пароль совпадает со старым.
+        """
+        user = await self.get_by_id(db, user_id)
+        if user is None:
+            raise MarketPlaceError("Пользователь не найден.", 404)
+
+        # Проверка старого пароля
+        if not verify_password(data.old_password, user.hashed_password):
+            logger.warning("Неудачная попытка смены пароля для пользователя id=%d", user_id)
+            raise MarketPlaceError("Неверный текущий пароль.", 400)
+
+        # Запрет на установку того же пароля
+        if data.old_password == data.new_password:
+            raise MarketPlaceError("Новый пароль совпадает со старым.", 400)
+
+        # Хэширование и сохранение
+        user.hashed_password = hash_password(data.new_password)
+        await db.flush()
+        await db.refresh(user)
+        logger.info("Пароль изменён для пользователя id=%d", user_id)
 
     async def get_by_id(self, db: AsyncSession, user_id: int) -> UserORM | None:
         """Получить пользователя по ID."""

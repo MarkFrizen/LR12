@@ -1,15 +1,20 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 *.egg-info/
 dist/
 build/
 *.egg
+*.so
+*.manifest
+*.spec
 
 # Virtual environment
 venv/
-.env
+.venv/
 *.venv
+env/
 
 # IDE
 .vscode/
@@ -17,17 +22,43 @@ venv/
 *.swp
 *.swo
 *~
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
+*.DS_Store
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+
+# Logs
+logs/
+*.log
 
 # Project specific
 *.db
 *.sqlite3
 
-# Logs
-logs/
+# Agent / Qwen
+.qwen/
 
-# Agent
-.qwen
+# Jupyter
+.ipynb_checkpoints/
+
+# Type checking
+.mypy_cache/
+.pyre/
+.pytype/
+*.pyc

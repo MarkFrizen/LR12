@@ -113,3 +113,9 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=20)
     email: Optional[EmailStr] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    """Схема смены пароля."""
+    old_password: str = Field(..., min_length=1, description="Текущий пароль")
+    new_password: str = Field(..., min_length=6, max_length=128, description="Новый пароль (мин. 6 символов)")

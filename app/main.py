@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.config import settings as app_settings
 from app.database import Base, engine
 from app.exceptions import MarketPlaceError, marketplace_exception_handler
 from app.logger import get_logger, setup_logging
@@ -24,12 +25,17 @@ from app.routers import (
     reviews,
     commissions,
 )
+from app.auth.config import auth_settings
 from app.auth.router import router as auth_router
 from app.templates.setup import setup_jinja
 
 # Настройка логирования при запуске
 setup_logging()
 logger = get_logger(__name__)
+
+# Валидация обязательных секретов перед запуском
+app_settings.validate_db_password()
+auth_settings.validate_secrets()
 
 
 @asynccontextmanager
@@ -51,10 +57,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS — разрешённые источники из конфигурации
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=app_settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

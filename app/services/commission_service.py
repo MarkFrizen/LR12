@@ -1,5 +1,8 @@
 """
 CRUD-операции для сущности «Комиссия».
+
+Все операции с комиссиями доступны только администраторам
+(защита настроена на уровне роутера).
 """
 
 from typing import Optional
@@ -27,6 +30,19 @@ class CommissionService:
         self.db = db
 
     async def create(self, data: CommissionCreate) -> CommissionORM:
+        """
+        Создать новую комиссию.
+
+        Args:
+            data: Данные комиссии.
+
+        Returns:
+            CommissionORM — сохранённая комиссия.
+
+        Raises:
+            SellerNotFoundError: Если продавец не найден.
+            OrderNotFoundError: Если заказ не найден.
+        """
         seller = await self.db.execute(
             select(SellerORM).where(SellerORM.id == data.seller_id)
         )
@@ -50,6 +66,7 @@ class CommissionService:
         return commission
 
     async def get_by_id(self, commission_id: int) -> CommissionORM:
+        """Получить комиссию по ID."""
         result = await self.db.execute(
             select(CommissionORM).where(CommissionORM.id == commission_id)
         )
@@ -67,6 +84,7 @@ class CommissionService:
         seller_id: Optional[int] = None,
         status: Optional[str] = None,
     ) -> list[CommissionORM]:
+        """Получить список комиссий."""
         query = select(CommissionORM)
         if seller_id is not None:
             query = query.where(CommissionORM.seller_id == seller_id)
@@ -81,6 +99,7 @@ class CommissionService:
     async def update(
         self, commission_id: int, data: CommissionUpdate
     ) -> CommissionORM:
+        """Обновить комиссию (только для администратора)."""
         commission = await self.get_by_id(commission_id)
         update_data = data.model_dump(exclude_unset=True)
         old_status = commission.status
@@ -93,6 +112,7 @@ class CommissionService:
         return commission
 
     async def delete(self, commission_id: int) -> None:
+        """Удалить комиссию (только для администратора)."""
         commission = await self.get_by_id(commission_id)
         await self.db.delete(commission)
         await self.db.flush()
