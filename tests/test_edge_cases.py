@@ -15,6 +15,7 @@ from decimal import Decimal
 
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
+from unittest.mock import patch
 
 from app.exceptions import (
     ProductNotFoundError,
@@ -116,12 +117,16 @@ async def test_commission_nonexistent_seller(db_session: AsyncSession):
     """Создание комиссии у несуществующего продавца → SellerNotFoundError."""
     service = CommissionService(db=db_session)
     with pytest.raises(SellerNotFoundError):
-        await service.create(CommissionCreate(
-            order_id=1,
-            seller_id=999,
-            amount=Decimal("10"),
-            percentage=Decimal("10.00"),
-        ))
+        with patch("app.services.commission_service.logger") as mock_logger:
+            await service.create(CommissionCreate(
+                order_id=1,
+                seller_id=999,
+                amount=Decimal("10"),
+                percentage=Decimal("10.00"),
+            ))
+        mock_logger.warning.assert_called_once_with(
+            "Попытка создать комиссию у несуществующего продавца id=%d", 999
+        )
 
 
 @pytest.mark.asyncio

@@ -51,7 +51,7 @@ def test_setup_logging_configures_formatter():
     for handler in root_logger.handlers:
         assert isinstance(handler.formatter, logging.Formatter)
         assert "%(asctime)s" in handler.formatter._fmt
-        assert "%(levelname)s" in handler.formatter._fmt
+        assert "[%(levelname)-7s]" in handler.formatter._fmt
         assert "%(name)s" in handler.formatter._fmt
         assert "%(message)s" in handler.formatter._fmt
 

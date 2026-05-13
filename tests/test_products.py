@@ -7,6 +7,7 @@
 import pytest
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
+from unittest.mock import patch
 
 from app.exceptions import ProductNotFoundError, SellerNotFoundError
 from app.models.product import ProductCreate, ProductUpdate
@@ -38,9 +39,13 @@ async def test_create_product(db_session: AsyncSession):
 async def test_create_product_invalid_seller(db_session: AsyncSession):
     service = ProductService(db=db_session)
     with pytest.raises(SellerNotFoundError):
-        await service.create(ProductCreate(
-            seller_id=999, name="Ghost", price=Decimal("100"), stock=1
-        ), user_id=_TEST_USER_ID)
+        with patch("app.services.product_service.logger") as mock_logger:
+            await service.create(ProductCreate(
+                seller_id=999, name="Ghost", price=Decimal("100"), stock=1
+            ), user_id=_TEST_USER_ID)
+        mock_logger.warning.assert_called_once_with(
+            "Попытка создать товар у несуществующего продавца id=%d", 999
+        )
 
 
 @pytest.mark.asyncio
@@ -92,6 +97,10 @@ async def test_delete_product(db_session: AsyncSession):
     product = await service.create(ProductCreate(
         seller_id=seller.id, name="DelMe", price=Decimal("50"), stock=2
     ), user_id=_TEST_USER_ID)
-    await service.delete(product.id)
+    with patch("app.services.product_service.logger") as mock_logger:
+        await service.delete(product.id)
+        mock_logger.info.assert_called_once_with(
+            "Удалён товар id=%d name='%s'", product.id, product.name
+        )
     with pytest.raises(ProductNotFoundError):
         await service.get_by_id(product.id)
