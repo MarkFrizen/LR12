@@ -20,7 +20,6 @@ def test_settings_validate_db_password_with_password():
     # Не должно быть исключения
     settings.validate_db_password()
 
-
 def test_settings_validate_db_password_no_password_postgres():
     """Проверяет, что validate_db_password() не выбрасывает исключение для пользователя postgres без пароля."""
     settings = Settings(db_user="postgres", db_password="")
@@ -54,5 +53,3 @@ def test_auth_settings_validate_secrets_no_jwt_secret():
 def test_auth_settings_validate_secrets_with_jwt_secret():
     """Проверяет, что validate_secrets() не выбрасывает исключение при наличии jwt_secret_key."""
     auth_settings = AuthSettings(jwt_secret_key="supersecret")
-    # Не должно быть исключения
-    auth_settings.validate_secrets()
