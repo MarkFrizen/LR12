@@ -59,8 +59,8 @@ jobs:
         id: openai_description
         uses: koudaiii/openai-api@v3
         with:
-          endpoint: "https://api.openai.com/v1/chat/completions"
-          model: "gpt-4o-mini"
+          endpoint: "https://openrouter.ai/api/v1"
+          model: "qwen/qwen3-coder"
           messages: |
             [
               {
