@@ -17,9 +17,9 @@ class Settings(BaseSettings):
     # Порт PostgreSQL по умолчанию
     db_port: int = 5432
     # Имя пользователя БД
-    db_user: str = "postgres"
+    db_user: str = "user1"
     # Пароль пользователя БД (обязателен — не оставляйте пустым!)
-    db_password: str = Field(default="", alias="MP_DB_PASSWORD")
+    db_password: str = "123"
     # Имя базы данных
     db_name: str = "marketplace_platform"
 
