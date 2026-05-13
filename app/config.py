@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # Порт PostgreSQL по умолчанию
     db_port: int = 5432
     # Имя пользователя БД
-    db_user: str = "mp_user"
+    db_user: str = "postgres"
     # Пароль пользователя БД (обязателен — не оставляйте пустым!)
     db_password: str = Field(default="", alias="MP_DB_PASSWORD")
     # Имя базы данных
@@ -55,9 +55,9 @@ class Settings(BaseSettings):
         Проверить, что пароль БД задан перед подключением.
 
         Raises:
-            RuntimeError: Если пароль не задан.
+            RuntimeError: Если пароль не задан и используется несистемный пользователь.
         """
-        if not self.db_password:
+        if not self.db_password and self.db_user != "postgres":
             raise RuntimeError(
                 "MP_DB_PASSWORD не задан! "
                 "Установите пароль в .env или переменной окружения."
@@ -69,6 +69,8 @@ class Settings(BaseSettings):
         "env_file_encoding": "utf-8",
         # Префикс для переменных окружения, чтобы избежать конфликтов
         "env_prefix": "MP_",
+        # Разрешить дополнительные поля, используемые в наследниках (например, MP_JWT_SECRET)
+        "extra": "allow",
     }
 
 

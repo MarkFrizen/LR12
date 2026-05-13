@@ -37,6 +37,12 @@ class AuthSettings(Settings):
                 "Пример: MP_JWT_SECRET=your-secure-random-string-here"
             )
 
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "env_prefix": "MP_",
+    }
+
 
 auth_settings = AuthSettings()
 
