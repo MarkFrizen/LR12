@@ -913,6 +913,48 @@ TOTAL                                 1516     81    95%
 ### Промпт 5
 **Промпт:** "Проанализируй код с наиболее низким тестовым покрытием. Допиши тесты там, где это возможно. Запусти тесты и дай отчёт о тестовом покрытии."
 **Результат:**
+Name                                 Stmts   Miss  Cover   Missing
+------------------------------------------------------------------
+app/__init__.py                          0      0   100%
+app/auth/__init__.py                     0      0   100%
+app/auth/config.py                      12      0   100%
+app/auth/models.py                      60      1    98%   69
+app/auth/service.py                     92     12    87%   67, 122-123, 146, 185, 189-193, 208-211, 219, 233
+app/auth/utils.py                       21      0   100%
+app/config.py                           20      1    95%   51
+app/database.py                         17      0   100%
+app/exceptions.py                       30      0   100%
+app/logger.py                           22      0   100%
+app/models/__init__.py                   0      0   100%
+app/models/commission.py                36      1    97%   43
+app/models/order.py                     44      1    98%   59
+app/models/product.py                   41      1    98%   42
+app/models/review.py                    33      1    97%   39
+app/models/seller.py                    33      1    97%   37
+app/services/__init__.py                 0      0   100%
+app/services/commission_service.py      61     10    84%   88-97
+app/services/order_service.py           70      0   100%
+app/services/product_service.py         60     12    80%   80-90, 115-117
+app/services/review_service.py          78     12    85%   116-125, 187-189
+app/services/seller_service.py          58      4    93%   115-120
+tests/__init__.py                        0      0   100%
+tests/conftest.py                       38      9    76%   78-85, 96-98
+tests/test_auth.py                     128      0   100%
+tests/test_commissions.py               52      0   100%
+tests/test_config.py                    22      0   100%
+tests/test_database.py                  35      1    97%   43
+tests/test_edge_cases.py                99      1    99%   127
+tests/test_exceptions.py                14      0   100%
+tests/test_logger.py                    44      0   100%
+tests/test_order_service.py            135      3    98%   115-125
+tests/test_orders.py                    55      0   100%
+tests/test_products.py                  56      1    98%   46
+tests/test_reviews.py                   73      0   100%
+tests/test_sellers.py                   64      1    98%   39
+------------------------------------------------------------------
+TOTAL                                 1603     73    95%
+
+Общее количество тестов выросло до 92, при этом тестовое покрытие осталось на уровне 5% дальнейшее увеличение уровня тестовоо покрытия нецелесобразно. При этом при дальнейшем расширении проекта следует поддерживать данный уровень тестового покрытия
 
 ### Итого
 - Количество промптов: 

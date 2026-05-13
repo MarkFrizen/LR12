@@ -1,7 +1,4 @@
 import pytest
-from unittest.mock import patch
-from app.auth.config import AuthSettings
-
 from app.config import Settings
 from app.auth.config import AuthSettings
 
@@ -26,27 +23,15 @@ def test_settings_validate_db_password_no_password_postgres():
     # Не должно быть исключения
     settings.validate_db_password()
 
-def test_auth_settings_validate_secrets_no_jwt_secret():
+def test_auth_settings_validate_secrets_no_jwt_secret(monkeypatch):
     """Проверяет, что validate_secrets() выбрасывает RuntimeError при отсутствии jwt_secret_key."""
-    # Импортируем оригинальный класс
-    from app.auth.config import AuthSettings as OriginalAuthSettings
-    
-    # Создаем подкласс, который наследует оригинальный класс
-    class TestAuthSettings(OriginalAuthSettings):
-        def __init__(self):
-            # Инициализируем с пустым jwt_secret_key
-            super().__init__(jwt_secret_key="", model_config={"env_file": None})
-    
-    # Создаем экземпляр тестового класса
-    auth_settings = TestAuthSettings()
-    try:
+    # conftest.py устанавливает MP_JWT_SECRET; убираем из окружения,
+    # чтобы Pydantic не прочитал его и не переопределил пустую строку
+    monkeypatch.delenv("MP_JWT_SECRET", raising=False)
+
+    auth_settings = AuthSettings(jwt_secret_key="", _env_file=None)
+    with pytest.raises(RuntimeError) as exc:
         auth_settings.validate_secrets()
-    except RuntimeError as e:
-        assert "MP_JWT_SECRET не задан!" in str(e)
-        return
-    assert False, "validate_secrets() не выбросил RuntimeError"
-    assert "MP_JWT_SECRET не задан!" in str(exc.value)
-    assert "MP_JWT_SECRET не задан!" in str(exc.value)
     assert "MP_JWT_SECRET не задан!" in str(exc.value)
 
 
