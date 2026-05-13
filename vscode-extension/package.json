@@ -1,0 +1,64 @@
+{
+  "name": "explain-marketplace-code",
+  "displayName": "Explain Marketplace Code",
+  "description": "Объясняет выделенный код через OpenAI API в контексте учебного проекта маркетплейса",
+  "version": "0.2.0",
+  "publisher": "mtp-student",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "explainMarketplaceCode",
+        "title": "Explain Marketplace Code"
+      },
+      {
+        "command": "explainMarketplaceCode.setApiKey",
+        "title": "Explain Marketplace Code: Set OpenAI API Key"
+      },
+      {
+        "command": "explainMarketplaceCode.setDefaultPrompt",
+        "title": "Explain Marketplace Code: Set Default Prompt"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "explainMarketplaceCode",
+        "key": "ctrl+shift+e",
+        "when": "editorTextFocus",
+        "mac": "cmd+shift+e"
+      }
+    ],
+    "configuration": {
+      "title": "Explain Marketplace Code",
+      "properties": {
+        "explainMarketplaceCode.apiKey": {
+          "type": "string",
+          "default": null,
+          "description": "OpenAI API-ключ (sk-...). Можно установить через команду Set OpenAI API Key."
+        },
+        "explainMarketplaceCode.model": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "description": "Модель OpenAI для генерации объяснения (gpt-4o-mini, gpt-4o, и т.д.)."
+        },
+        "explainMarketplaceCode.endpoint": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "Базовый URL OpenAI API (для прокси или кастомного эндпоинта)."
+        },
+        "explainMarketplaceCode.defaultPrompt": {
+          "type": "string",
+          "default": "Объясни этот код в контексте платформы маркетплейса",
+          "description": "Промпт по умолчанию, который подставляется в InputBox."
+        }
+      }
+    }
+  }
+}

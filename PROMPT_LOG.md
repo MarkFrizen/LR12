@@ -656,18 +656,160 @@ prompt: 7 типовых ошибок маркетплейса
 - Время: ~60 мин
 ## Задание 5: Создание плагина для IDE.
 ### Промпт 1
-**Промпт:** ""
-**Результат:** 
+**Промпт:** "Сгенерируй минимально рабочее расширение для VS Code, добавляющее команду "Explain Marketplace Code". Опиши файлы package.json и extension.js. По горячей клавише Ctrl+Shift+E плагин должен вызывать эту команду."
+**Результат:** Созданы 2 файла в vscode-extension/:
+- package.json
+- extension.js
 ### Промпт 2
-**Промпт:** ""
-**Результат:** 
+**Промпт:** "Реализуй в extension.js логику: при вызове команды выделенный текст из редактора отправляется в OpenAI API с промптом "Объясни этот код в контексте платформы маркетплейса". Ответ выводится в боковой панели Webview. Добавь возможность указать кастомный промпт через InputBox."
+**Результат:** Расширение полностью переписано:
+- Убран vscode.lm (Copilot), всё идёт напрямую в OpenAI Chat Completions API через fetch.
+     - Промпт запрашивается через InputBox с предзаполненным значением.
+     - API-ключ хранится в VS Code settings (explainMarketplaceCode.apiKey), при первом запуске — запрос через showInputBox с password: true.
+     - Весь ответ модели отображается в боковой webview-панели (рендер Markdown → HTML).
+     - Добавлены вспомогательные команды для настройки из палитры команд.
 ### Промпт 3
-**Промпт:** ""
-**Результат:** 
+**Промпт:** "Напиши инструкцию по локальной установке и тестированию плагина. Для демонстрации возьми функцию calculate_commission из маркетплейса и покажи, как плагин объясняет её логику. Приведи текст ответа, который должен появиться в Webview."
+**Результат:** Написана инструкция по установке и тестированию:
+    1. Копирование расширения
+     1 # Из корня проекта LR12
+     2 cp -r vscode-extension ~/.vscode/extensions/explain-marketplace-code
+    Либо открыть папку vscode-extension в VS Code и нажать F5 (Run Extension)
+    — откроется новое окно с расширением.
+    2. Проверка установки
+     - Откройте любой .py-файл из проекта.
+     - Нажмите Ctrl+Shift+P, начните печатать Explain Marketplace Code — команда
+        должна появиться в палитре.
+     - Ctrl+Shift+E (в редакторе) также должен сработать.
+    3. Настройка API-ключа
+    При первом вызове команды расширение само запросит ключ через InputBox.
+    Альтернативно:
+     1 # Через настройки VS Code
+     2 Ctrl+Shift+P → "Explain Marketplace Code: Set OpenAI API Key"
+    Или вручную в settings.json:
+     1 "explainMarketplaceCode.apiKey": "sk-proj-..."
+    ---
+    4. Демонстрация: объяснение OrderService.create()
+    Шаг 1. Откройте app/services/order_service.py.
+    Шаг 2. Выделите метод create (строки 32–88):
+      1 async def create(self, data: OrderCreate, buyer_username: str) -> OrderORM:
+      2     seller = await self.db.execute(
+      3         select(SellerORM).where(SellerORM.id == data.seller_id)
+      4     )
+      5     if seller.scalar_one_or_none() is None:
+      6         raise SellerNotFoundError(data.seller_id)
+      7 
+      8     product = await self.db.execute(
+      9         select(ProductORM).where(ProductORM.id == data.product_id)
+     10     )
+     11     product_obj = product.scalar_one_or_none()
+     12     if product_obj is None:
+     13         raise ProductNotFoundError(data.product_id)
+     14 
+     15     if product_obj.stock < data.quantity:
+     16         raise InsufficientStockError(
+     17             product_id=data.product_id,
+     18             requested=data.quantity,
+     19             available=product_obj.stock,
+     20         )
+     21 
+     22     product_obj.stock -= data.quantity
+     23     total_price: Decimal = product_obj.price * Decimal(data.quantity)
+     24 
+     25     order = OrderORM(
+     26         product_id=data.product_id,
+     27         seller_id=data.seller_id,
+     28         buyer_name=buyer_username,
+     29         quantity=data.quantity,
+     30         total_price=total_price,
+     31     )
+     32     self.db.add(order)
+     33     await self.db.flush()
+     34     await self.db.refresh(order)
+     35     return order
+    Шаг 3. Нажмите `Ctrl+Shift+E`.
+    Шаг 4. В появившемся InputBox будет предзаполнен промпт:
+     1 Объясни этот код в контексте платформы маркетплейса
+    Нажмите Enter.
+    ---
+    5. Ожидаемый ответ в Webview
+    Ниже приведён текст, который появится в боковой панели. GPT-4o-mini вернёт
+     примерно такой ответ:
+     1 ## Обзор метода `OrderService.create()`
+     2 
+     3 Этот метод создаёт новый заказ в маркетплейсе. Он выполняет три последовательные проверки,
+     4 вычисляет стоимость и сохраняет заказ в базу данных.
+     5 
+     6 ### 1. Валидация продавца
+    seller = await self.db.execute(
+        select(SellerORM).where(SellerORM.id == data.seller_id)
+    )
+    if seller.scalar_one_or_none() is None:
+        raise SellerNotFoundError(data.seller_id)
+     1 
+     2 Проверяется, что продавец с указанным `seller_id` существует. Если нет —
+     3 выбрасывается кастомное исключение `SellerNotFoundError`. Это защищает от
+     4 создания заказов у несуществующих продавцов (ссылочная целостность на уровне
+     5 бизнес-логики, не только БД).
+     6 
+     7 ### 2. Валидация товара и остатка
+    if product_obj.stock < data.quantity:
+        raise InsufficientStockError(...)
+    product_obj.stock -= data.quantity
+     1 
+     2 Сначала проверяется, что товар существует, затем — что на складе достаточно
+     3 единиц. Если всё хорошо — остаток уменьшается прямо в объекте (асинхронный
+     4 ORM сохранит изменение при `flush`). Это пример **оптимистичной целостности
+     5 данных**: проверка и списание происходят в одной транзакции.
+     6 
+     7 ### 3. Расчёт стоимости
+    total_price: Decimal = product_obj.price * Decimal(data.quantity)
+     1 
+     2 Используется `Decimal` для денежных расчётов — это правильный подход,
+     3 исключающий ошибки округления чисел с плавающей точкой (`float`).
+     4 
+     5 ### 4. Безопасность: buyer_name из JWT
+    order = OrderORM(..., buyer_name=buyer_username, ...)
+      1 
+      2 Имя покупателя не берётся из тела запроса (`data`), а передаётся отдельным
+      3 параметром из JWT-токена текущего пользователя. Это предотвращает подмену
+      4 покупателя злоумышленником (один из принципов **CWE-602: Server-Side
+      5 Input Validation**).
+      6 
+      7 ### 5. SOLID-анализ
+      8 
+      9 | Принцип | Как соблюдается |
+     10 |---------|----------------|
+     11 | **SRP** | Метод отвечает только за создание заказа. Проверки, расчёт
+        и сохранение — в одном месте, но это единая ответственность «создание 
+        заказа». |
+     12 | **OCP** | Для изменения логики валидации не нужно править этот метод
+        — достаточно изменить exceptions. |
+     13 | **DIP** | `OrderService` зависит от абстракции `AsyncSession`, а не 
+        от конкретной БД. |
+     14 
+     15 ### Рекомендация
+     16 
+     17 Добавить **повторную проверку остатка товара** непосредственно перед
+     18 `self.db.flush()` через `SELECT ... FOR UPDATE`, чтобы избежать race condition
+     19 при конкурентных запросах:
+    product_obj = (
+        await self.db.execute(
+            select(ProductORM).where(ProductORM.id == data.product_id)
+            .with_for_update()
+        )
+    ).scalar_one()
+     1 
+    ---
+    6. Проверка кастомного промпта
+    Вызовите команду снова, но в InputBox введите:
+     1 Найди уязвимости безопасности в этом коде
+    Расширение отправит ваш кастомный промпт вместо дефолтного, и модель
+    сфокусируется на поиске уязвимостей.
 ### Итого
-- Количество промптов: 
-- Что пришлось исправлять вручную: 
-- Время: ~ мин
+- Количество промптов: 3
+- Что пришлось исправлять вручную: ничего
+- Время: ~15 мин
 ## Задание 6: Сравнение разных ИИ-моделей.
 ### Промпт 1
 **Промпт:** ""
