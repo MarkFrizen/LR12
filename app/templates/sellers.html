@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Продавцы{% endblock %}
+{% block content %}
+<section class="page-section">
+    <h1>Продавцы</h1>
+
+    <div id="sellerFormContainer" style="display:none;" class="card" style="margin-bottom:1rem;">
+        <h3 id="sellerFormTitle">Добавить продавца</h3>
+        <form id="sellerForm" onsubmit="return saveSeller(event)">
+            <input type="hidden" id="editSellerId" value="">
+            <div class="form-group"><label>Имя</label><input type="text" id="sellerName" required></div>
+            <div class="form-group"><label>Email</label><input type="email" id="sellerEmail" required></div>
+            <div class="form-group"><label>Телефон</label><input type="text" id="sellerPhone"></div>
+            <button type="submit" class="btn btn-primary" id="sellerFormBtn">Сохранить</button>
+            <button type="button" class="btn btn-secondary" onclick="cancelSellerForm()">Отмена</button>
+        </form>
+    </div>
+
+    <button class="btn btn-primary" id="addSellerBtn" style="margin-bottom:1rem;" onclick="showSellerForm()">+ Добавить продавца</button>
+
+    <div id="sellersList" class="data-list"><p>Загрузка...</p></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentUser = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+    try {
+        const res = await fetch('/api/v1/auth/me', { headers: {'Authorization': `Bearer ${token}`} });
+        if (!res.ok) throw new Error('Unauthorized');
+        currentUser = await res.json();
+        await loadSellers();
+    } catch { localStorage.removeItem('token'); window.location.href = '/login'; }
+});
+
+async function loadSellers() {
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch('/api/v1/sellers/', { headers: {'Authorization': `Bearer ${token}`} });
+        const sellers = await res.json();
+        const list = document.getElementById('sellersList');
+        if (sellers.length === 0) { list.innerHTML = '<p class="empty">Продавцы не найдены.</p>'; return; }
+        const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'moderator');
+        const canDelete = currentUser && currentUser.role === 'admin';
+        list.innerHTML = `<table><thead><tr>
+            <th>ID</th><th>Имя</th><th>Email</th><th>Телефон</th><th>Рейтинг</th>
+            ${(canEdit || canDelete) ? '<th>Действия</th>' : ''}
+        </tr></thead><tbody>
+            ${sellers.map(s => `<tr>
+                <td>${s.id}</td>
+                <td>${s.name}</td>
+                <td>${s.email}</td>
+                <td>${s.phone || '—'}</td>
+                <td>${s.rating || '0.0'}</td>
+                ${(canEdit || canDelete) ? `<td>
+                    ${canEdit ? `<button class="btn-sm" onclick="editSeller(${s.id}, '${s.name}', '${s.email}', '${s.phone || ''}')">✏️</button>` : ''}
+                    ${canDelete ? `<button class="btn-sm" onclick="deleteSeller(${s.id})">🗑️</button>` : ''}
+                </td>` : ''}
+            </tr>`).join('')}
+        </tbody></table>`;
+    } catch { document.getElementById('sellersList').innerHTML = '<p class="error">Ошибка загрузки</p>'; }
+}
+
+function showSellerForm(data) {
+    document.getElementById('sellerFormContainer').style.display = 'block';
+    document.getElementById('addSellerBtn').style.display = 'none';
+    if (data) {
+        document.getElementById('sellerFormTitle').textContent = 'Редактировать продавца';
+        document.getElementById('editSellerId').value = data.id;
+        document.getElementById('sellerName').value = data.name;
+        document.getElementById('sellerEmail').value = data.email;
+        document.getElementById('sellerPhone').value = data.phone || '';
+        document.getElementById('sellerFormBtn').textContent = 'Обновить';
+    }
+}
+
+function cancelSellerForm() {
+    document.getElementById('sellerFormContainer').style.display = 'none';
+    document.getElementById('addSellerBtn').style.display = 'inline-block';
+    document.getElementById('sellerForm').reset();
+    document.getElementById('editSellerId').value = '';
+    document.getElementById('sellerFormTitle').textContent = 'Добавить продавца';
+    document.getElementById('sellerFormBtn').textContent = 'Сохранить';
+}
+
+async function saveSeller(e) {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const id = document.getElementById('editSellerId').value;
+    const data = {
+        name: document.getElementById('sellerName').value,
+        email: document.getElementById('sellerEmail').value,
+        phone: document.getElementById('sellerPhone').value || null,
+    };
+    try {
+        const url = id ? `/api/v1/sellers/${id}` : '/api/v1/sellers/';
+        const method = id ? 'PATCH' : 'POST';
+        const res = await fetch(url, {
+            method, headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        cancelSellerForm();
+        await loadSellers();
+    } catch { alert('Ошибка сохранения'); }
+}
+
+async function editSeller(id, name, email, phone) {
+    showSellerForm({id, name, email, phone});
+}
+
+async function deleteSeller(id) {
+    if (!confirm('Удалить продавца?')) return;
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`/api/v1/sellers/${id}`, { method: 'DELETE', headers: {'Authorization': `Bearer ${token}`} });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        await loadSellers();
+    } catch { alert('Ошибка удаления'); }
+}
+</script>
+{% endblock %}

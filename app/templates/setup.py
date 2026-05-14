@@ -70,3 +70,11 @@ def setup_jinja(app: FastAPI) -> None:
     @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
     async def admin_page(request: Request):
         return _render("admin.html", request)
+
+    @app.get("/sellers-page", response_class=HTMLResponse, include_in_schema=False)
+    async def sellers_page(request: Request):
+        return _render("sellers.html", request)
+
+    @app.get("/commissions-page", response_class=HTMLResponse, include_in_schema=False)
+    async def commissions_page(request: Request):
+        return _render("commissions.html", request)

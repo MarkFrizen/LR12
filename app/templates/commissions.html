@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Комиссии{% endblock %}
+{% block content %}
+<section class="page-section">
+    <h1>Комиссии</h1>
+
+    <div id="commissionFormContainer" style="display:none;" class="card" style="margin-bottom:1rem;">
+        <h3 id="commissionFormTitle">Добавить комиссию</h3>
+        <form id="commissionForm" onsubmit="return saveCommission(event)">
+            <input type="hidden" id="editCommissionId" value="">
+            <div class="form-group"><label>ID заказа</label><input type="number" id="commissionOrderId" required min="1"></div>
+            <div class="form-group"><label>ID продавца</label><input type="number" id="commissionSellerId" required min="1"></div>
+            <div class="form-group"><label>Сумма</label><input type="number" id="commissionAmount" required min="0.01" step="0.01"></div>
+            <div class="form-group"><label>Процент</label><input type="number" id="commissionPercentage" required min="0.01" max="100" step="0.01"></div>
+            <div class="form-group"><label>Статус</label>
+                <select id="commissionStatus">
+                    <option value="pending">Ожидает</option>
+                    <option value="paid">Выплачена</option>
+                    <option value="refunded">Возвращена</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary" id="commissionFormBtn">Сохранить</button>
+            <button type="button" class="btn btn-secondary" onclick="cancelCommissionForm()">Отмена</button>
+        </form>
+    </div>
+
+    <button class="btn btn-primary" id="addCommissionBtn" style="margin-bottom:1rem;display:none;" onclick="showCommissionForm()">+ Добавить комиссию</button>
+
+    <div class="filters">
+        <input type="number" id="filterCommissionSeller" placeholder="ID продавца" min="1">
+        <select id="filterCommissionStatus">
+            <option value="">Все статусы</option>
+            <option value="pending">Ожидает</option>
+            <option value="paid">Выплачена</option>
+            <option value="refunded">Возвращена</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadCommissions()">Фильтр</button>
+    </div>
+
+    <div id="commissionsList" class="data-list"><p>Загрузка...</p></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentUser = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+    try {
+        const res = await fetch('/api/v1/auth/me', { headers: {'Authorization': `Bearer ${token}`} });
+        if (!res.ok) throw new Error('Unauthorized');
+        currentUser = await res.json();
+        if (currentUser.role === 'admin') {
+            document.getElementById('addCommissionBtn').style.display = 'inline-block';
+        }
+        await loadCommissions();
+    } catch { localStorage.removeItem('token'); window.location.href = '/login'; }
+});
+
+async function loadCommissions() {
+    const token = localStorage.getItem('token');
+    const sellerId = document.getElementById('filterCommissionSeller').value;
+    const status = document.getElementById('filterCommissionStatus').value;
+    let url = '/api/v1/commissions/?limit=50';
+    if (sellerId) url += `&seller_id=${sellerId}`;
+    if (status) url += `&status=${status}`;
+    try {
+        const res = await fetch(url, { headers: {'Authorization': `Bearer ${token}`} });
+        const commissions = await res.json();
+        const list = document.getElementById('commissionsList');
+        if (commissions.length === 0) { list.innerHTML = '<p class="empty">Комиссий нет.</p>'; return; }
+        const isAdmin = currentUser && currentUser.role === 'admin';
+        list.innerHTML = `<table><thead><tr>
+            <th>ID</th><th>Заказ</th><th>Продавец</th><th>Сумма</th><th>Процент</th><th>Статус</th><th>Дата</th>
+            ${isAdmin ? '<th>Действия</th>' : ''}
+        </tr></thead><tbody>
+            ${commissions.map(c => `<tr>
+                <td>${c.id}</td>
+                <td>${c.order_id}</td>
+                <td>${c.seller_id}</td>
+                <td>${c.amount} ₽</td>
+                <td>${c.percentage}%</td>
+                <td><span class="status status-${c.status}">${c.status}</span></td>
+                <td>${c.created_at ? new Date(c.created_at).toLocaleDateString('ru-RU') : '—'}</td>
+                ${isAdmin ? `<td>
+                    <button class="btn-sm" onclick="editCommission(${c.id}, ${c.order_id}, ${c.seller_id}, ${c.amount}, ${c.percentage}, '${c.status}')">✏️</button>
+                    <button class="btn-sm" onclick="deleteCommission(${c.id})">🗑️</button>
+                </td>` : ''}
+            </tr>`).join('')}
+        </tbody></table>`;
+    } catch { document.getElementById('commissionsList').innerHTML = '<p class="error">Ошибка загрузки</p>'; }
+}
+
+function showCommissionForm(data) {
+    document.getElementById('commissionFormContainer').style.display = 'block';
+    document.getElementById('addCommissionBtn').style.display = 'none';
+    if (data) {
+        document.getElementById('commissionFormTitle').textContent = 'Редактировать комиссию';
+        document.getElementById('editCommissionId').value = data.id;
+        document.getElementById('commissionOrderId').value = data.orderId;
+        document.getElementById('commissionSellerId').value = data.sellerId;
+        document.getElementById('commissionAmount').value = data.amount;
+        document.getElementById('commissionPercentage').value = data.percentage;
+        document.getElementById('commissionStatus').value = data.status;
+        document.getElementById('commissionFormBtn').textContent = 'Обновить';
+    }
+}
+
+function cancelCommissionForm() {
+    document.getElementById('commissionFormContainer').style.display = 'none';
+    document.getElementById('addCommissionBtn').style.display = 'inline-block';
+    document.getElementById('commissionForm').reset();
+    document.getElementById('editCommissionId').value = '';
+    document.getElementById('commissionFormTitle').textContent = 'Добавить комиссию';
+    document.getElementById('commissionFormBtn').textContent = 'Сохранить';
+}
+
+async function saveCommission(e) {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const id = document.getElementById('editCommissionId').value;
+    const data = {
+        order_id: parseInt(document.getElementById('commissionOrderId').value),
+        seller_id: parseInt(document.getElementById('commissionSellerId').value),
+        amount: parseFloat(document.getElementById('commissionAmount').value),
+        percentage: parseFloat(document.getElementById('commissionPercentage').value),
+        status: document.getElementById('commissionStatus').value,
+    };
+    try {
+        const url = id ? `/api/v1/commissions/${id}` : '/api/v1/commissions/';
+        const method = id ? 'PATCH' : 'POST';
+        const res = await fetch(url, {
+            method, headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        cancelCommissionForm();
+        await loadCommissions();
+    } catch { alert('Ошибка сохранения'); }
+}
+
+async function deleteCommission(id) {
+    if (!confirm('Удалить комиссию?')) return;
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`/api/v1/commissions/${id}`, { method: 'DELETE', headers: {'Authorization': `Bearer ${token}`} });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        await loadCommissions();
+    } catch { alert('Ошибка удаления'); }
+}
+</script>
+{% endblock %}

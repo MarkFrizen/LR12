@@ -292,6 +292,20 @@ body {
     margin-bottom: 1.5rem;
 }
 
+.status-select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background: var(--surface);
+    cursor: pointer;
+}
+
+.status-select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
 /* ========== Tables ========== */
 .data-list { margin-top: 1rem; }
 
