@@ -7,7 +7,8 @@
 - test_engine      — движок на :memory: (scope=session)
 - db_session       — изолированная сессия на каждый тест
 - override_get_db  — подмена зависимости FastAPI get_db
-- test_client      — FastAPI TestClient с переопределённой get_db
+- mock_lifespan    — отключение lifespan для предотвращения подключения к реальной БД
+- test_client      — FastAPI TestClient с переопределённой get_db и без реального lifespan
 """
 
 import os
@@ -15,12 +16,14 @@ import os
 # Установка переменных окружения для тестовой среды
 # (должна быть до любого импорта app-модулей)
 os.environ.setdefault("MP_JWT_SECRET", "test-secret-key-not-for-production")
+os.environ.setdefault("MP_DB_PASSWORD", "test-password")
 
 from collections.abc import AsyncGenerator
-from typing import AsyncGenerator
+from contextlib import asynccontextmanager
 
 import pytest
 import pytest_asyncio
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -86,12 +89,35 @@ async def override_get_db(db_session: AsyncSession) -> AsyncGenerator[None, None
 
 
 @pytest.fixture
-def test_client(override_get_db: None) -> TestClient:
+def mock_lifespan(override_get_db: None) -> None:
+    """
+    Отключить lifespan FastAPI-приложения в тестах.
+
+    Lifespan (app/main.py) использует реальный PostgreSQL engine.
+    Заменяем его на no-op, чтобы TestClient не пытался подключиться
+    к реальной БД. Таблицы создаются в db_session отдельно.
+    """
+    from app.main import app
+
+    @asynccontextmanager
+    async def noop_lifespan(_app: FastAPI):
+        """Пустой lifespan — ничего не делает."""
+        yield
+
+    original = app.router.lifespan_context
+    app.router.lifespan_context = noop_lifespan
+    yield
+    app.router.lifespan_context = original
+
+
+@pytest.fixture
+def test_client(mock_lifespan, override_get_db: None) -> TestClient:
     """
     FastAPI TestClient с изолированной тестовой БД.
 
     Все эндпоинты работают через in-memory SQLite;
     get_db подменена на db_session из override_get_db.
+    Lifespan отключён (mock_lifespan) — реальная БД не требуется.
     """
     from app.main import app
     with TestClient(app) as client:
