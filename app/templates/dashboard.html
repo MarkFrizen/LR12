@@ -6,6 +6,31 @@
     <div id="userInfo" class="card">
         <p>Загрузка данных...</p>
     </div>
+
+    <!-- Аналитика -->
+    <div id="analyticsSection" style="display:none;">
+        <h2>Аналитика</h2>
+        <div class="analytics-grid" id="analyticsGrid"></div>
+        <div class="top-products-section" id="topProductsSection" style="display:none;">
+            <h3>Топ товаров</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Товар</th>
+                            <th>Категория</th>
+                            <th>Заказов</th>
+                            <th>Выручка</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topProductsBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Навигационные карточки -->
     <div class="dashboard-grid" id="dashboardGrid"></div>
 </section>
 {% endblock %}
@@ -24,6 +49,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             <h3>Добро пожаловать, ${user.full_name || user.username}!</h3>
             <p>Роль: <strong>${user.role}</strong> | Email: ${user.email}</p>
         `;
+
+        // Загружаем аналитику для администраторов и модераторов
+        if (user.role === 'admin' || user.role === 'moderator') {
+            await loadAnalytics(token);
+        }
+
+        // Навигационные карточки
         const grid = document.getElementById('dashboardGrid');
         const cards = [
             {title: '🛍️ Товары', link: '/products-page', desc: 'Просмотр и управление товарами'},
@@ -45,5 +77,62 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = '/login';
     }
 });
+
+async function loadAnalytics(token) {
+    try {
+        const res = await fetch('/api/v1/analytics/summary?top_limit=5', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        if (!res.ok) throw new Error('Analytics unavailable');
+        const data = await res.json();
+
+        document.getElementById('analyticsSection').style.display = 'block';
+
+        // Карточки метрик
+        const grid = document.getElementById('analyticsGrid');
+        const metrics = [
+            {title: '💰 Общий оборот', value: formatCurrency(data.total_revenue), color: '#22c55e'},
+            {title: '🧾 Средний чек', value: formatCurrency(data.avg_order_value), color: '#6366f1'},
+            {title: '📦 Всего заказов', value: data.orders_count, color: '#f59e0b'},
+            {title: '✅ Выплачено комиссий', value: formatCurrency(data.commissions.total_paid), color: '#22c55e'},
+            {title: '⏳ Ожидает комиссий', value: formatCurrency(data.commissions.total_pending), color: '#f59e0b'},
+            {title: '🔄 Возвращено комиссий', value: formatCurrency(data.commissions.total_refunded), color: '#ef4444'},
+        ];
+        grid.innerHTML = metrics.map(m => `
+            <div class="analytics-card" style="border-top: 4px solid ${m.color};">
+                <div class="analytics-card-title">${m.title}</div>
+                <div class="analytics-card-value">${m.value}</div>
+            </div>
+        `).join('');
+
+        // Топ товаров
+        if (data.top_products && data.top_products.length > 0) {
+            document.getElementById('topProductsSection').style.display = 'block';
+            const tbody = document.getElementById('topProductsBody');
+            tbody.innerHTML = data.top_products.map((p, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${escapeHtml(p.product_name)}</td>
+                    <td>${p.category ? escapeHtml(p.category) : '—'}</td>
+                    <td>${p.orders_count}</td>
+                    <td>${formatCurrency(p.total_revenue)}</td>
+                </tr>
+            `).join('');
+        }
+    } catch (err) {
+        console.warn('Аналитика недоступна:', err);
+    }
+}
+
+function formatCurrency(value) {
+    const num = parseFloat(value);
+    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 2 }).format(num);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 </script>
 {% endblock %}

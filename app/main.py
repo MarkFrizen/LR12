@@ -24,6 +24,7 @@ from app.routers import (
     orders,
     reviews,
     commissions,
+    analytics,
 )
 from app.auth.config import auth_settings
 from app.auth.router import router as auth_router
@@ -83,6 +84,7 @@ app.include_router(products.router)
 app.include_router(orders.router)
 app.include_router(reviews.router)
 app.include_router(commissions.router)
+app.include_router(analytics.router)
 
 
 @app.get("/api/health", tags=["Health"])
