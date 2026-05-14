@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum as PyEnum
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import Boolean, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -76,11 +76,25 @@ class UserORM(Base):
 class UserCreate(BaseModel):
     """Схема регистрации нового пользователя."""
     username: str = Field(..., min_length=3, max_length=100)
-    email: EmailStr
-    password: str = Field(..., min_length=6, max_length=128)
+    email: EmailStr = Field(..., max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
     role: UserRole = Field(default=UserRole.BUYER)
     full_name: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=20)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """Проверить, что пароль содержит буквы разного регистра, цифру и спецсимвол."""
+        if not any(c.isupper() for c in v):
+            raise ValueError("Пароль должен содержать хотя бы одну заглавную букву.")
+        if not any(c.islower() for c in v):
+            raise ValueError("Пароль должен содержать хотя бы одну строчную букву.")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Пароль должен содержать хотя бы одну цифру.")
+        if not any(c in "!@#$%^&*(),.?\":{}|<>_-" for c in v):
+            raise ValueError("Пароль должен содержать хотя бы один спецсимвол (!@#$%^&* etc.).")
+        return v
 
 
 class UserLogin(BaseModel):
@@ -114,10 +128,10 @@ class UserUpdate(BaseModel):
     """Схема обновления профиля."""
     full_name: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=20)
-    email: Optional[EmailStr] = None
+    email: Optional[EmailStr] = Field(None, max_length=255)
 
 
 class ChangePasswordRequest(BaseModel):
     """Схема смены пароля."""
     old_password: str = Field(..., min_length=1, description="Текущий пароль")
-    new_password: str = Field(..., min_length=6, max_length=128, description="Новый пароль (мин. 6 символов)")
+    new_password: str = Field(..., min_length=8, max_length=128, description="Новый пароль (мин. 8 символов, заглавная/строчная буква, цифра, спецсимвол)")

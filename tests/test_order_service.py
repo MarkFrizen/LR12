@@ -45,7 +45,7 @@ from app.services.seller_service import SellerService
 
 _BUYER_USERNAME = "test_buyer_ord"
 _SELLER_USERNAME = "test_seller_ord"
-_PASSWORD = "testpass123"
+_PASSWORD = "TestPass123!"
 _DEFAULT_USER_ID = 1
 _MOD_ROLE = "admin"
 _PROD_PRICE = Decimal("100.00")

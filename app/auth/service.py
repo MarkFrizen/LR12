@@ -116,6 +116,11 @@ class AuthService:
         password_valid = verify_password(data.password, password_hash)
 
         if not password_valid or user is None:
+            if user is None:
+                logger.warning("Неудачная попытка входа: пользователь '%s' не найден", data.username)
+            else:
+                logger.warning("Неудачная попытка входа для пользователя id=%d username='%s' — неверный пароль",
+                               user.id, data.username)
             raise MarketPlaceError("Неверное имя пользователя или пароль.", 401)
 
         if not user.is_active:
