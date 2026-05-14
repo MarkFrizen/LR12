@@ -16,6 +16,7 @@ import os
 # Установка переменных окружения для тестовой среды
 # (должна быть до любого импорта app-модулей)
 os.environ.setdefault("MP_JWT_SECRET", "test-secret-key-not-for-production")
+os.environ.setdefault("MP_DB_PASSWORD", "test-password")
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
