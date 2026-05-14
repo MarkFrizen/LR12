@@ -78,7 +78,7 @@ async def update_review(
 
     Доступно: автору отзыва, модератору, администратору.
     """
-    return await service.update(review_id, data, user_id=current_user.id, user_role=current_user.role)
+    return await service.update(review_id, data, user_id=current_user.id, user_role=current_user.role, username=current_user.username)
 
 
 @router.delete("/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -88,4 +88,4 @@ async def delete_review(
     current_user: UserORM = Depends(get_current_user),
 ):
     """Удалить отзыв (автор, модератор, администратор)."""
-    await service.delete(review_id, user_id=current_user.id, user_role=current_user.role)
+    await service.delete(review_id, user_id=current_user.id, user_role=current_user.role, username=current_user.username)

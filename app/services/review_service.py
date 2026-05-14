@@ -11,25 +11,20 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.models import MODERATION_ROLE_VALUES
 from app.exceptions import ReviewNotFoundError, SellerNotFoundError, ProductNotFoundError
 from app.logger import get_logger
 from app.models.product import ProductORM
 from app.models.seller import SellerORM
 from app.models.review import ReviewCreate, ReviewORM, ReviewUpdate
+from app.services.base import BaseService
 
 logger = get_logger(__name__)
 
-# Роли, которым разрешено управлять любыми отзывами
-_MODERATION_ROLES = {"admin", "moderator"}
 
-
-class ReviewService:
+class ReviewService(BaseService):
     """Сервис для управления отзывами."""
-
-    def __init__(self, db: AsyncSession):
-        self.db = db
 
     async def create(self, data: ReviewCreate, buyer_username: str) -> ReviewORM:
         """
@@ -125,7 +120,8 @@ class ReviewService:
         return reviews
 
     async def update(
-        self, review_id: int, data: ReviewUpdate, user_id: int, user_role: str
+        self, review_id: int, data: ReviewUpdate,
+        user_id: int, user_role: str, username: str
     ) -> ReviewORM:
         """
         Обновить отзыв.
@@ -133,8 +129,9 @@ class ReviewService:
         Args:
             review_id: ID отзыва.
             data: Новые данные (rating, comment).
-            user_id: ID текущего пользователя.
+            user_id: ID текущего пользователя (для логирования).
             user_role: Роль текущего пользователя.
+            username: Имя текущего пользователя (из JWT).
 
         Returns:
             ReviewORM — обновлённый отзыв.
@@ -145,8 +142,8 @@ class ReviewService:
         """
         review = await self.get_by_id(review_id)
 
-        # Проверка прав: автор или модератор/админ
-        if user_role not in _MODERATION_ROLES:
+        # Проверка прав: автор (по username) или модератор/админ
+        if user_role not in MODERATION_ROLE_VALUES and review.buyer_name != username:
             logger.warning("Пользователь id=%d попытался изменить отзыв id=%d (автор='%s')",
                            user_id, review_id, review.buyer_name)
             raise HTTPException(
@@ -166,15 +163,16 @@ class ReviewService:
         return review
 
     async def delete(
-        self, review_id: int, user_id: int, user_role: str
+        self, review_id: int, user_id: int, user_role: str, username: str
     ) -> None:
         """
         Удалить отзыв.
 
         Args:
             review_id: ID отзыва.
-            user_id: ID текущего пользователя.
+            user_id: ID текущего пользователя (для логирования).
             user_role: Роль текущего пользователя.
+            username: Имя текущего пользователя (из JWT).
 
         Raises:
             HTTPException(403): Если пользователь не является автором
@@ -182,8 +180,8 @@ class ReviewService:
         """
         review = await self.get_by_id(review_id)
 
-        # Проверка прав: автор или модератор/админ
-        if user_role not in _MODERATION_ROLES and review.buyer_name != str(user_id):
+        # Проверка прав: автор (по username) или модератор/админ
+        if user_role not in MODERATION_ROLE_VALUES and review.buyer_name != username:
             logger.warning("Пользователь id=%d попытался удалить отзыв id=%d (автор='%s')",
                            user_id, review_id, review.buyer_name)
             raise HTTPException(

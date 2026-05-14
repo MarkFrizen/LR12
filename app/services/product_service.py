@@ -9,24 +9,19 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.models import MODERATION_ROLE_VALUES
 from app.exceptions import ProductNotFoundError, SellerNotFoundError
 from app.logger import get_logger
 from app.models.product import ProductCreate, ProductORM, ProductUpdate
 from app.models.seller import SellerORM
+from app.services.base import BaseService
 
 logger = get_logger(__name__)
 
-# Роли, которым разрешено управлять любыми товарами
-_MODERATION_ROLES = {"admin", "moderator"}
 
-
-class ProductService:
+class ProductService(BaseService):
     """Сервис для управления товарами."""
-
-    def __init__(self, db: AsyncSession):
-        self.db = db
 
     async def create(self, data: ProductCreate, user_id: int) -> ProductORM:
         """
@@ -111,7 +106,7 @@ class ProductService:
         product = await self.get_by_id(product_id)
 
         # Проверка прав: владелец товара или модератор/админ
-        if user_role not in _MODERATION_ROLES and product.seller_id != user_id:
+        if user_role not in MODERATION_ROLE_VALUES and product.seller_id != user_id:
             logger.warning("Пользователь id=%d попытался изменить товар id=%d продавца id=%d",
                            user_id, product_id, product.seller_id)
             raise HTTPException(

@@ -9,23 +9,18 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.models import MODERATION_ROLE_VALUES
 from app.exceptions import DuplicateEmailError, SellerNotFoundError
 from app.logger import get_logger
 from app.models.seller import SellerCreate, SellerORM, SellerUpdate
+from app.services.base import BaseService
 
 logger = get_logger(__name__)
 
-# Роли, которым разрешено управлять любыми продавцами
-_MODERATION_ROLES = {"admin", "moderator"}
 
-
-class SellerService:
+class SellerService(BaseService):
     """Сервис для управления продавцами."""
-
-    def __init__(self, db: AsyncSession):
-        self.db = db
 
     async def create(self, data: SellerCreate, user_id: int) -> SellerORM:
         """
@@ -101,7 +96,7 @@ class SellerService:
         seller = await self.get_by_id(seller_id)
 
         # Проверка прав: владелец (по user_id == seller_id) или модератор/админ
-        if user_role not in _MODERATION_ROLES and seller.id != user_id:
+        if user_role not in MODERATION_ROLE_VALUES and seller.id != user_id:
             logger.warning("Пользователь id=%d попытался изменить продавца id=%d",
                            user_id, seller_id)
             raise HTTPException(

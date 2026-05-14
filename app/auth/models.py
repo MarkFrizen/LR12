@@ -28,6 +28,8 @@ class UserRole(str, PyEnum):
 
 # Роли, которые могут управлять контентом
 MODERATION_ROLES = {UserRole.ADMIN, UserRole.MODERATOR}
+# То же самое, но строковые значения (для сервисов, где не импортируют UserRole)
+MODERATION_ROLE_VALUES = {r.value for r in MODERATION_ROLES}
 
 # ─────────────────────────── ORM ───────────────────────────
 

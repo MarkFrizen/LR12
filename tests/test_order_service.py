@@ -480,13 +480,7 @@ async def test_delete_order(
 # ТЕСТЫ: API (TestClient)
 # ════════════════════════════════════════════════════════
 
-# TODO: раскомментировать после настройки переопределения
-#       всех зависимостей (get_db, get_current_user) для TestClient.
-# Сейчас тест-клиент подменяет get_db, но эндпоинты /api/v1/orders
-# также требуют Depends(get_current_user), который возвращает 401
-# без валидного Bearer-токена. auth_headers решает эту проблему.
 
-"""
 @pytest.mark.asyncio
 async def test_api_create_order(
     test_client,
@@ -528,4 +522,3 @@ async def test_api_list_orders(
     response = test_client.get("/api/v1/orders", headers=auth_headers)
     assert response.status_code == 200
     assert isinstance(response.json(), list)
-"""

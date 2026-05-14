@@ -8,7 +8,6 @@ CRUD-операции для сущности «Комиссия».
 from typing import Optional
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import (
     CommissionNotFoundError,
@@ -19,15 +18,13 @@ from app.logger import get_logger
 from app.models.commission import CommissionCreate, CommissionORM, CommissionUpdate
 from app.models.seller import SellerORM
 from app.models.order import OrderORM
+from app.services.base import BaseService
 
 logger = get_logger(__name__)
 
 
-class CommissionService:
+class CommissionService(BaseService):
     """Сервис для управления комиссиями."""
-
-    def __init__(self, db: AsyncSession):
-        self.db = db
 
     async def create(self, data: CommissionCreate) -> CommissionORM:
         """

@@ -11,8 +11,8 @@ from decimal import Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.models import MODERATION_ROLE_VALUES
 from app.exceptions import (
     InsufficientStockError,
     OrderNotFoundError,
@@ -23,18 +23,13 @@ from app.logger import get_logger
 from app.models.order import OrderCreate, OrderORM, OrderUpdate
 from app.models.product import ProductORM
 from app.models.seller import SellerORM
+from app.services.base import BaseService
 
 logger = get_logger(__name__)
 
-# Роли, которым разрешено управлять любыми заказами
-_MODERATION_ROLES = {"admin", "moderator"}
 
-
-class OrderService:
+class OrderService(BaseService):
     """Сервис для управления заказами."""
-
-    def __init__(self, db: AsyncSession):
-        self.db = db
 
     async def create(self, data: OrderCreate, buyer_username: str) -> OrderORM:
         """
@@ -146,7 +141,7 @@ class OrderService:
         order = await self.get_by_id(order_id)
 
         # Проверка прав
-        if user_role not in _MODERATION_ROLES and order.seller_id != user_id:
+        if user_role not in MODERATION_ROLE_VALUES and order.seller_id != user_id:
             logger.warning("Пользователь id=%d попытался изменить статус заказа id=%d",
                            user_id, order_id)
             raise HTTPException(

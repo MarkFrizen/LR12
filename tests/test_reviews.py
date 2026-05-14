@@ -105,25 +105,25 @@ async def test_update_review(db_session: AsyncSession):
         buyer_username="U",
     )
     
-    # Затем пытаемся его обновить без прав
+    # Затем пытаемся его обновить без прав (не автор и не модератор)
     with patch("app.services.review_service.logger") as mock_logger:
         with pytest.raises(Exception) as exc_info:
             await service.update(
                 review.id, ReviewUpdate(rating=4, comment="Updated"),
-                user_id=_TEST_USER_ID, user_role="buyer",  # не модератор и не автор
+                user_id=_TEST_USER_ID, user_role="buyer", username="other_user",
             )
         # Проверяем, что это HTTPException с кодом 403
         from fastapi import HTTPException
         assert isinstance(exc_info.value, HTTPException)
         assert exc_info.value.status_code == 403
         mock_logger.warning.assert_called_once_with(
-            "Пользователь id=%d попытался изменить отзыв id=%d (автор='%s')", 
+            "Пользователь id=%d попытался изменить отзыв id=%d (автор='%s')",
             _TEST_USER_ID, review.id, "U"
         )
     # Обновляем отзыв с правами модератора
     updated = await service.update(
         review.id, ReviewUpdate(rating=4, comment="Updated"),
-        user_id=_TEST_USER_ID, user_role=_TEST_MOD_ROLE,
+        user_id=_TEST_USER_ID, user_role=_TEST_MOD_ROLE, username="U",
     )
     assert updated.rating == 4
     assert updated.comment == "Updated"
@@ -145,18 +145,18 @@ async def test_delete_review(db_session: AsyncSession):
         ReviewCreate(product_id=product.id, seller_id=seller.id, rating=3),
         buyer_username="X",
     )
-    await service.delete(review.id, user_id=_TEST_USER_ID, user_role=_TEST_MOD_ROLE)
+    await service.delete(review.id, user_id=_TEST_USER_ID, user_role=_TEST_MOD_ROLE, username="X")
     # Сначала создаем отзыв
-    review = await service.create(
+    review2 = await service.create(
         ReviewCreate(product_id=product.id, seller_id=seller.id, rating=3),
         buyer_username="X",
     )
-    
+
     # Затем удаляем его
     with patch("app.services.review_service.logger") as mock_logger:
-        await service.delete(review.id, user_id=_TEST_USER_ID, user_role=_TEST_MOD_ROLE)
+        await service.delete(review2.id, user_id=_TEST_USER_ID, user_role=_TEST_MOD_ROLE, username="X")
         mock_logger.info.assert_called_once_with(
-            "Удалён отзыв id=%d (user_id=%d)", review.id, _TEST_USER_ID
+            "Удалён отзыв id=%d (user_id=%d)", review2.id, _TEST_USER_ID
         )
     with pytest.raises(ReviewNotFoundError):
-        await service.get_by_id(review.id)
+        await service.get_by_id(review2.id)

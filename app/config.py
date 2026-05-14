@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # Имя пользователя БД
     db_user: str = "user1"
     # Пароль пользователя БД (обязателен — не оставляйте пустым!)
-    db_password: str = "123"
+    db_password: str = ""
     # Имя базы данных
     db_name: str = "marketplace_platform"
 
