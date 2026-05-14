@@ -39,17 +39,18 @@ jobs:
           fetch-depth: 0
 
       - name: Get git diff (base64)
-        id: git_diff
         run: |
-          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- . \
+          BYTES=$(git diff origin/${{ github.base_ref }}...HEAD -- . | wc -c)
+          if [ "$BYTES" -gt 15000 ]; then
+            echo "::warning::Дифф >15 КБ, обрезан до 15000 байт (факт: $BYTES байт)"
+          fi
+          git diff origin/${{ github.base_ref }}...HEAD -- . \
             | head -c 15000 \
-            | base64 -w 0)
-          echo "diff_b64=$DIFF" >> "$GITHUB_OUTPUT"
+            | base64 -w 0 > /tmp/git_diff.b64
 
       - name: Generate PR description via OpenRouter
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DIFF_B64: ${{ steps.git_diff.outputs.diff_b64 }}
         run: python3 .github/scripts/generate_pr_description.py
 
       - name: Post PR description comment
@@ -66,10 +67,9 @@ jobs:
               body: body,
             });
 
-      - name: Run AI Code Review via OpenAI
+      - name: Run AI Code Review via OpenRouter
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DIFF_B64: ${{ steps.git_diff.outputs.diff_b64 }}
         run: python3 .github/scripts/run_code_review.py
 
       - name: Post AI Code Review comment
