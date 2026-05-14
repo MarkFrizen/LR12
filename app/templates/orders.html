@@ -3,6 +3,20 @@
 {% block content %}
 <section class="page-section">
     <h1>Заказы</h1>
+
+    <div id="orderFormContainer" style="display:none;" class="card" style="margin-bottom:1rem;">
+        <h3 id="orderFormTitle">Создать заказ</h3>
+        <form id="orderForm" onsubmit="return saveOrder(event)">
+            <div class="form-group"><label>ID товара</label><input type="number" id="orderProductId" required min="1"></div>
+            <div class="form-group"><label>ID продавца</label><input type="number" id="orderSellerId" required min="1"></div>
+            <div class="form-group"><label>Количество</label><input type="number" id="orderQuantity" required min="1" value="1"></div>
+            <button type="submit" class="btn btn-primary">Создать</button>
+            <button type="button" class="btn btn-secondary" onclick="cancelOrderForm()">Отмена</button>
+        </form>
+    </div>
+
+    <button class="btn btn-primary" id="addOrderBtn" style="margin-bottom:1rem;display:none;" onclick="showOrderForm()">+ Создать заказ</button>
+
     <div class="filters">
         <select id="filterStatus">
             <option value="">Все статусы</option>
@@ -19,6 +33,22 @@
 {% endblock %}
 {% block scripts %}
 <script>
+let currentUser = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+    try {
+        const res = await fetch('/api/v1/auth/me', { headers: {'Authorization': `Bearer ${token}`} });
+        if (!res.ok) throw new Error('Unauthorized');
+        currentUser = await res.json();
+        if (currentUser.role === 'admin' || currentUser.role === 'buyer') {
+            document.getElementById('addOrderBtn').style.display = 'inline-block';
+        }
+        await loadOrders();
+    } catch { localStorage.removeItem('token'); window.location.href = '/login'; }
+});
+
 async function loadOrders() {
     const token = localStorage.getItem('token');
     const status = document.getElementById('filterStatus').value;
@@ -34,8 +64,11 @@ async function loadOrders() {
             list.innerHTML = '<p class="empty">Заказы не найдены.</p>';
             return;
         }
+        const canManage = currentUser && (currentUser.role === 'admin' || currentUser.role === 'moderator');
+        const canDelete = currentUser && currentUser.role === 'admin';
         list.innerHTML = `<table><thead><tr>
             <th>ID</th><th>Товар</th><th>Покупатель</th><th>Кол-во</th><th>Сумма</th><th>Статус</th>
+            ${(canManage || canDelete) ? '<th>Действия</th>' : ''}
         </tr></thead><tbody>
             ${orders.map(o => `<tr>
                 <td>${o.id}</td>
@@ -44,10 +77,74 @@ async function loadOrders() {
                 <td>${o.quantity}</td>
                 <td>${o.total_price} ₽</td>
                 <td><span class="status status-${o.status}">${o.status}</span></td>
+                ${(canManage || canDelete) ? `<td>
+                    ${canManage ? `<select class="status-select" onchange="updateOrderStatus(${o.id}, this.value)">
+                        <option value="">Сменить статус</option>
+                        <option value="pending">Ожидание</option>
+                        <option value="confirmed">Подтверждён</option>
+                        <option value="shipped">Отправлен</option>
+                        <option value="delivered">Доставлен</option>
+                        <option value="cancelled">Отменён</option>
+                    </select>` : ''}
+                    ${canDelete ? `<button class="btn-sm" onclick="deleteOrder(${o.id})">🗑️</button>` : ''}
+                </td>` : ''}
             </tr>`).join('')}
         </tbody></table>`;
     } catch { document.getElementById('ordersList').innerHTML = '<p class="error">Ошибка загрузки</p>'; }
 }
-document.addEventListener('DOMContentLoaded', loadOrders);
+
+function showOrderForm() {
+    document.getElementById('orderFormContainer').style.display = 'block';
+    document.getElementById('addOrderBtn').style.display = 'none';
+}
+
+function cancelOrderForm() {
+    document.getElementById('orderFormContainer').style.display = 'none';
+    document.getElementById('addOrderBtn').style.display = 'inline-block';
+    document.getElementById('orderForm').reset();
+}
+
+async function saveOrder(e) {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const data = {
+        product_id: parseInt(document.getElementById('orderProductId').value),
+        seller_id: parseInt(document.getElementById('orderSellerId').value),
+        quantity: parseInt(document.getElementById('orderQuantity').value),
+    };
+    try {
+        const res = await fetch('/api/v1/orders/', {
+            method: 'POST', headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        cancelOrderForm();
+        await loadOrders();
+    } catch { alert('Ошибка создания заказа'); }
+}
+
+async function updateOrderStatus(id, newStatus) {
+    if (!newStatus) return;
+    if (!confirm('Изменить статус заказа?')) return;
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`/api/v1/orders/${id}`, {
+            method: 'PATCH', headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
+            body: JSON.stringify({status: newStatus}),
+        });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        await loadOrders();
+    } catch { alert('Ошибка обновления статуса'); }
+}
+
+async function deleteOrder(id) {
+    if (!confirm('Удалить заказ?')) return;
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`/api/v1/orders/${id}`, { method: 'DELETE', headers: {'Authorization': `Bearer ${token}`} });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        await loadOrders();
+    } catch { alert('Ошибка удаления'); }
+}
 </script>
 {% endblock %}

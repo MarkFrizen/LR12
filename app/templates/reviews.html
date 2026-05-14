@@ -3,6 +3,30 @@
 {% block content %}
 <section class="page-section">
     <h1>Отзывы покупателей</h1>
+
+    <div id="reviewFormContainer" style="display:none;" class="card" style="margin-bottom:1rem;">
+        <h3 id="reviewFormTitle">Оставить отзыв</h3>
+        <form id="reviewForm" onsubmit="return saveReview(event)">
+            <input type="hidden" id="editReviewId" value="">
+            <div class="form-group"><label>ID товара</label><input type="number" id="reviewProductId" required min="1"></div>
+            <div class="form-group"><label>ID продавца</label><input type="number" id="reviewSellerId" required min="1"></div>
+            <div class="form-group"><label>Оценка</label>
+                <select id="reviewRating" required>
+                    <option value="5">5 — Отлично</option>
+                    <option value="4">4 — Хорошо</option>
+                    <option value="3">3 — Нормально</option>
+                    <option value="2">2 — Плохо</option>
+                    <option value="1">1 — Ужасно</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Комментарий</label><textarea id="reviewComment" rows="3"></textarea></div>
+            <button type="submit" class="btn btn-primary" id="reviewFormBtn">Отправить</button>
+            <button type="button" class="btn btn-secondary" onclick="cancelReviewForm()">Отмена</button>
+        </form>
+    </div>
+
+    <button class="btn btn-primary" id="addReviewBtn" style="margin-bottom:1rem;display:none;" onclick="showReviewForm()">+ Оставить отзыв</button>
+
     <div class="filters">
         <input type="number" id="filterProduct" placeholder="ID товара" min="1">
         <button class="btn btn-primary" onclick="loadReviews()">Поиск</button>
@@ -12,6 +36,22 @@
 {% endblock %}
 {% block scripts %}
 <script>
+let currentUser = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+    try {
+        const res = await fetch('/api/v1/auth/me', { headers: {'Authorization': `Bearer ${token}`} });
+        if (!res.ok) throw new Error('Unauthorized');
+        currentUser = await res.json();
+        if (currentUser.role === 'admin' || currentUser.role === 'buyer') {
+            document.getElementById('addReviewBtn').style.display = 'inline-block';
+        }
+        await loadReviews();
+    } catch { localStorage.removeItem('token'); window.location.href = '/login'; }
+});
+
 async function loadReviews() {
     const token = localStorage.getItem('token');
     const productId = document.getElementById('filterProduct').value;
@@ -27,20 +67,82 @@ async function loadReviews() {
             list.innerHTML = '<p class="empty">Отзывов нет.</p>';
             return;
         }
+        const isMod = currentUser && (currentUser.role === 'admin' || currentUser.role === 'moderator');
         list.innerHTML = `<div class="reviews-grid">
-            ${reviews.map(r => `
-                <div class="review-card">
+            ${reviews.map(r => {
+                const canEdit = isMod || (currentUser && currentUser.username === r.buyer_name);
+                const canDelete = isMod || (currentUser && currentUser.username === r.buyer_name);
+                return `<div class="review-card">
                     <div class="review-header">
                         <strong>${r.buyer_name}</strong>
                         <span class="rating">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
                     </div>
                     <p class="review-comment">${r.comment || 'Без комментария'}</p>
                     <small>Товар #${r.product_id}</small>
-                </div>
-            `).join('')}
+                    ${(canEdit || canDelete) ? `<div style="margin-top:0.5rem;">
+                        ${canEdit ? `<button class="btn-sm" onclick="editReview(${r.id}, ${r.product_id}, ${r.seller_id}, ${r.rating}, '${(r.comment||'').replace(/'/g, "\\'")}')">✏️</button>` : ''}
+                        ${canDelete ? `<button class="btn-sm" onclick="deleteReview(${r.id})">🗑️</button>` : ''}
+                    </div>` : ''}
+                </div>`;
+            }).join('')}
         </div>`;
     } catch { document.getElementById('reviewsList').innerHTML = '<p class="error">Ошибка загрузки</p>'; }
 }
-document.addEventListener('DOMContentLoaded', loadReviews);
+
+function showReviewForm(data) {
+    document.getElementById('reviewFormContainer').style.display = 'block';
+    document.getElementById('addReviewBtn').style.display = 'none';
+    if (data) {
+        document.getElementById('reviewFormTitle').textContent = 'Редактировать отзыв';
+        document.getElementById('editReviewId').value = data.id;
+        document.getElementById('reviewProductId').value = data.productId;
+        document.getElementById('reviewSellerId').value = data.sellerId;
+        document.getElementById('reviewRating').value = data.rating;
+        document.getElementById('reviewComment').value = data.comment;
+        document.getElementById('reviewFormBtn').textContent = 'Обновить';
+    }
+}
+
+function cancelReviewForm() {
+    document.getElementById('reviewFormContainer').style.display = 'none';
+    document.getElementById('addReviewBtn').style.display = 'inline-block';
+    document.getElementById('reviewForm').reset();
+    document.getElementById('editReviewId').value = '';
+    document.getElementById('reviewFormTitle').textContent = 'Оставить отзыв';
+    document.getElementById('reviewFormBtn').textContent = 'Отправить';
+}
+
+async function saveReview(e) {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const id = document.getElementById('editReviewId').value;
+    const data = {
+        product_id: parseInt(document.getElementById('reviewProductId').value),
+        seller_id: parseInt(document.getElementById('reviewSellerId').value),
+        rating: parseInt(document.getElementById('reviewRating').value),
+        comment: document.getElementById('reviewComment').value || null,
+    };
+    try {
+        const url = id ? `/api/v1/reviews/${id}` : '/api/v1/reviews/';
+        const method = id ? 'PATCH' : 'POST';
+        const res = await fetch(url, {
+            method, headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        cancelReviewForm();
+        await loadReviews();
+    } catch { alert('Ошибка сохранения'); }
+}
+
+async function deleteReview(id) {
+    if (!confirm('Удалить отзыв?')) return;
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`/api/v1/reviews/${id}`, { method: 'DELETE', headers: {'Authorization': `Bearer ${token}`} });
+        if (!res.ok) { const err = await res.json(); alert(err.detail || 'Ошибка'); return; }
+        await loadReviews();
+    } catch { alert('Ошибка удаления'); }
+}
 </script>
 {% endblock %}
