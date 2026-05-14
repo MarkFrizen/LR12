@@ -1,7 +1,8 @@
 """
-Скрипт для генерации описания PR через OpenRouter AI API.
+Скрипт для генерации описания PR через OpenRouter API.
 
 Используется в GitHub Actions workflow ai-pr-description.yml.
+Читает git diff из /tmp/git_diff.b64 (записан на шаге 2).
 Сохраняет результат в /tmp/pr_description.txt.
 """
 
@@ -10,7 +11,15 @@ import os
 import urllib.request
 
 API_KEY = os.environ.get("OPENAI_API_KEY", "")
-DIFF_B64 = os.environ.get("DIFF_B64", "")
+
+DIFF_PATH = "/tmp/git_diff.b64"
+if not os.path.exists(DIFF_PATH):
+    raise FileNotFoundError(
+        f"Файл с git diff не найден: {DIFF_PATH}. "
+        "Убедитесь, что шаг 'Get git diff' выполнен."
+    )
+with open(DIFF_PATH, "r") as f:
+    DIFF_B64 = f.read().strip()
 
 SYSTEM_MSG = (
     "Ты — ассистент, анализирующий изменения кода в Pull Request. "
